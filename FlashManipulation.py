@@ -153,8 +153,71 @@ class ASASM:
 			index+=1
 		return parsed_lines
 
+	def ConvertMapsToPrintable(self,(blocks,maps,labels)):
+		#Convert blocks,maps
+		name2id_maps={}
+		id2name_maps={}
+
+		blocks_by_id={}
+		for (block_name,instructions) in blocks.items():
+			id=block_name
+			name2id_maps[block_name]=id
+			id2name_maps[id]="%d" % id
+			diasm_lines=''
+			for (keyword,parameter) in instructions:
+				if keyword:
+					parameter_line=''
+					current_line_length=0
+					for ch in parameter:
+						parameter_line+=ch
+						current_line_length+=1
+						if current_line_length>10 and ch==',':
+							parameter_line+='\n\ \ \ \ \ \ \ \ '
+							current_line_length=0
+
+					diasm_lines+='%s %s\n' % (keyword,parameter_line)
+
+			blocks_by_id[id]=[0,diasm_lines]
+
+		maps_by_id={}
+		for (src_block_name,target_block_names) in maps.items():
+			target_ids=[]
+			for target_block_name in target_block_names:
+				target_ids.append(name2id_maps[target_block_name])
+			maps_by_id[name2id_maps[src_block_name]]=target_ids
+
+		if self.DebugMethods>0:
+			pprint.pprint(blocks_by_id)
+			pprint.pprint(maps_by_id)
+			pprint.pprint(id2name_maps)
+			print ''
+		return [blocks_by_id,maps_by_id,id2name_maps]
+
+	def ReplaceCode(self,parsed_lines,target_refid,code_parsed_lines):
+		start_index=0
+		end_index=0
+		index=0
+		for [prefix,keyword,parameter,comment] in parsed_lines:
+			if keyword=='refid':
+				refid=parameter[1:-1]
+
+			if keyword=='code':
+				if refid==target_refid:
+					start_index=index+1
+
+			elif keyword=='end':
+				if start_index>0:
+					end_index=index-1
+					break
+
+			index+=1
+
+		parsed_lines[start_index:end_index]=code_parsed_lines
+
+		return parsed_lines
+
 	DebugMethods=0
-	def RetrieveMethod(self,parsed_lines):
+	def RetrieveMethod(self,parsed_lines,target_method=''):
 		if self.DebugMethods>0:
 			print '-' * 80
 		parents=[]
@@ -177,20 +240,22 @@ class ASASM:
 					print '* New block %s (end of code)' % block_name
 
 				if len(instructions)>0:
-					if last_block_name and not jumped:
+					if last_block_name and not is_last_instruction_jmp:
 						if self.DebugMethods>0:
 							print '%s -> %s' % (last_block_name,block_name)
 						if not maps.has_key(last_block_name):
 							maps[last_block_name]=[block_name]
 						else:
-							maps[last_block_name].append(block_name)
+							if not block_name in maps[last_block_name]:
+								maps[last_block_name].append(block_name)
 
 					blocks[block_name]=instructions
 					if self.DebugMethods>0:
 						pprint.pprint(instructions)
 						print ''
 					instructions=[]
-					jumped=False
+					is_last_instruction_jmp=False
+
 				in_code=False
 
 				if self.DebugMethods>0:
@@ -199,45 +264,7 @@ class ASASM:
 					pprint.pprint(maps)
 					print ''
 
-				#Convert blocks, maps
-				name2id_maps={}
-				id2name_maps={}
-
-				blocks_by_id={}
-				for (block_name,instructions) in blocks.items():
-					id=int(block_name[1:])
-					name2id_maps[block_name]=id
-					id2name_maps[id]=block_name
-					diasm_lines=''
-					for (keyword,parameter) in instructions:
-						if keyword:
-							parameter_line=''
-							current_line_length=0
-							for ch in parameter:
-								parameter_line+=ch
-								current_line_length+=1
-								if current_line_length>10 and ch==',':
-									parameter_line+='\n\ \ \ \ \ \ \ \ '
-									current_line_length=0
-
-							diasm_lines+='%s %s\n' % (keyword,parameter_line)
-
-					blocks_by_id[id]=[0,diasm_lines]
-
-				maps_by_id={}
-				for (src_block_name,target_block_names) in maps.items():
-					target_ids=[]
-					for target_block_name in target_block_names:
-						target_ids.append(name2id_maps[target_block_name])
-					maps_by_id[name2id_maps[src_block_name]]=target_ids
-
-				if self.DebugMethods>0:
-					pprint.pprint(blocks_by_id)
-					pprint.pprint(maps_by_id)
-					pprint.pprint(id2name_maps)
-					print ''
-
-				methods[refid]=[blocks_by_id,maps_by_id,id2name_maps]
+				methods[refid]=[blocks,maps,labels]
 
 				if self.DebugMethods>0:
 					print '='*80
@@ -247,19 +274,21 @@ class ASASM:
 
 				blocks={}
 				maps={}
+				labels={}
 
 			if in_code:
 				if keyword[-1:]==":":
 					if len(instructions)>0:
 						if self.DebugMethods>0:
 							print '* New block %s (start of block)' % block_name
-						if last_block_name and not jumped:
+						if last_block_name and not is_last_instruction_jmp:
 							if self.DebugMethods>0:
-								print '%s -> %s' % (last_block_name,block_name)
+								print '%s -> %s (Label)' % (last_block_name,block_name)
 							if not maps.has_key(last_block_name):
 								maps[last_block_name]=[block_name]
 							else:
-								maps[last_block_name].append(block_name)
+								if not block_name in maps[last_block_name]:
+									maps[last_block_name].append(block_name)
 
 						blocks[block_name]=instructions
 
@@ -270,49 +299,50 @@ class ASASM:
 						last_block_name=block_name
 
 						instructions=[]
-						jumped=False
-					block_name=keyword[0:-1]
+						is_last_instruction_jmp=False
+					block_name=instruction_count
+					labels[block_name]=keyword
 
 				elif keyword:
+					if len(instructions)==0 and last_block_name!=None and not is_last_instruction_jmp:
+						if self.DebugMethods>0:
+							print '%s -> %s (Flow)' % (last_block_name,block_name)
+
+						if not maps.has_key(last_block_name):
+							maps[last_block_name]=[block_name]
+						else:
+							if not block_name in maps[last_block_name]:
+								maps[last_block_name].append(block_name)
+
 					instructions.append([keyword,parameter])
 					instruction_count+=1
 					if keyword[0:2]=='if' or keyword=='jump':
-
 						if self.DebugMethods>0:
 							print '* New block %s (end of a block)' % block_name
 
 						if len(instructions)>0:
-							if last_block_name and not jumped:
-								if self.DebugMethods>0:
-									print '%s -> %s' % (last_block_name,block_name)
-								if not maps.has_key(last_block_name):
-									maps[last_block_name]=[block_name]
-								else:
-									maps[last_block_name].append(block_name)
-
 							blocks[block_name]=instructions
-
+							jump_location=int(parameter[1:])
 							if not maps.has_key(block_name):
-								maps[block_name]=[parameter]
+								maps[block_name]=[jump_location]
 							else:
-								maps[block_name].append(parameter)
+								if not jump_location in maps[block_name]:
+									maps[block_name].append(jump_location)						
 
 							if self.DebugMethods>0:
-								pprint.pprint(instructions)
-								print '%s -> %s' % (block_name,parameter)
+								print '%s -> %s (if/jmp)' % (block_name,jump_location)
 								print ''
 
-
 						last_block_name=block_name
-						block_name="L%.2d" % instruction_count
-
+						block_name=instruction_count
 						instructions=[]
-						jumped=False
 
-						if keyword=='jump':
-							jumped=True
+					if keyword=='jump':
+						is_last_instruction_jmp=True
+					else:
+						is_last_instruction_jmp=False
 
-			if keyword=='code':
+			if keyword=='code' and (target_method=='' or target_method==refid):
 				if self.DebugMethods>0:
 					print refid
 				in_code=True
@@ -320,11 +350,53 @@ class ASASM:
 				instruction_count=0
 				blocks={}
 				maps={}
-				block_name="L0"
-				last_block_name=''
-				jumped=False
+				labels={}
+
+				block_name=0
+				last_block_name=None
+				is_last_instruction_jmp=False
 
 		return methods
+
+	def RetrieveFile(self,file,target_method=''):
+		parsed_lines=self.ReadFile(file)
+		methods=self.RetrieveMethod(parsed_lines,target_method)
+		return [parsed_lines,methods]
+
+	def RetrieveAssembly(self,folder,target_file='',target_method=''):
+		files={}
+		for relative_file in self.EnumDir(folder):
+			if target_file=='' or target_file==relative_file:
+				file=os.path.join(folder, relative_file)
+
+				[parsed_lines,methods]=self.RetrieveFile(file,target_method)
+				if self.DebugMethods>0:
+					pprint.pprint(methods)
+				files[relative_file]=[parsed_lines,methods]
+
+		return files
+
+	def ConstructCode(self,blocks,labels):
+		ids=blocks.keys()
+		ids.sort()
+
+		parsed_lines=[]
+		label={}
+		for id in ids:
+			for (keyword,parameter) in blocks[id]:
+				if keyword[0:2]=='if' or keyword=='jump':
+					label[int(parameter[1:])]=1
+
+		for id in ids:
+			if labels.has_key(id):
+				parsed_lines.append(['',labels[id],'',''])
+			elif label.has_key(id):
+				parsed_lines.append(['','L%d:' % id,'',''])
+
+			for (keyword,parameter) in blocks[id]:
+				parsed_lines.append(['      ',keyword,parameter,''])
+
+		return parsed_lines
 
 	def AddMethodTrace(self,parsed_lines):
 		parents=[]
@@ -375,23 +447,6 @@ class ASASM:
 
 		return asasm_files
 
-	def RetrieveFile(self,file):
-		parsed_lines=self.ReadFile(file)
-		methods=self.RetrieveMethod(parsed_lines)
-		return methods
-
-	def RetrieveAssembly(self,folder):
-		files={}
-		for relative_file in self.EnumDir(folder):
-			file=os.path.join(folder, relative_file)
-
-			methods=self.RetrieveFile(file)
-			if self.DebugMethods>0:
-				pprint.pprint(methods)
-			files[relative_file]=methods
-
-		return files
-
 	def Instrument(self,folder,new_root_folder):
 		if not os.path.isdir(new_root_folder):
 			try:
@@ -428,6 +483,21 @@ class ASASM:
 			parsed_lines=self.AddMethodTrace(parsed_lines)
 			self.WriteFile(new_filename, parsed_lines)
 
+	def WriteFiles(self,files,target_dir):
+		for (file,(parsed_lines,methods)) in files.items():
+			for (refid,(blocks,maps,labels)) in methods.items():
+				code_parsed_lines=asasm.ConstructCode(blocks,labels)
+				parsed_lines=asasm.ReplaceCode(parsed_lines,refid,code_parsed_lines)
+			new_filename=os.path.join(target_dir,file)
+
+			new_folder=os.path.dirname(new_filename)
+			if not os.path.isdir(new_folder):
+				try:
+					os.makedirs(new_folder)
+				except:
+					pass
+			asasm.WriteFile(new_filename, parsed_lines)
+
 if __name__=='__main__':
 	from optparse import OptionParser
 	import sys
@@ -451,16 +521,18 @@ if __name__=='__main__':
 		def Draw(self,dir):
 			asasm=ASASM()
 
-			files=asasm.RetrieveAssembly(dir)
+			file='.\\_a_-_-_.class.asasm'
+			method='_a_-_-_/instance/_a_-_-_/instance/_a_-__-'
+			files=asasm.RetrieveAssembly(dir,file,method)
 
-			[disasms,links,address2name]=files[ '.\\_a_-_-_.class.asasm']['_a_-_-_/instance/_a_-_-_/instance/_a_-__-']
-
+			[disasms,links,address2name]=asasm.ConvertMapsToPrintable(files[file][1][method])
 			self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
 
 
 	parser=OptionParser()
 	parser.add_option("-g","--graph",dest="graph",action="store_true",default=False)
 	parser.add_option("-r","--replace",dest="replace",action="store_true",default=False)
+	parser.add_option("-c","--reconstruct",dest="reconstruct",action="store_true",default=False)
 	parser.add_option("-d","--dump",dest="dump",action="store_true",default=False)
 	(options,args)=parser.parse_args()
 
@@ -500,3 +572,14 @@ if __name__=='__main__':
 		files=asasm.RetrieveAssembly(dir)
 		pprint.pprint(files)
 		#asasm.RetrieveFile(os.path.join(dir,'.\\_a_-_-_.class.asasm'))
+
+	elif options.reconstruct:
+		target_dir=''
+		if len(sys.argv)>2:
+			target_dir=args[1]
+		asasm=ASASM()
+		asasm.DebugMethods=0
+		
+		files=asasm.RetrieveAssembly(dir)
+		asasm.WriteFiles(files,target_dir)
+

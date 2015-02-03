@@ -213,7 +213,8 @@ class MainWindow(QMainWindow):
 			ret=self.treeModel.getAssocData(index)
 			if ret!=None:
 				(class_name,method_name)=ret
-				[disasms,links,address2name]=self.Assembly[class_name][method_name]
+				asasm=ASASM()
+				[disasms,links,address2name]=asasm.ConvertMapsToPrintable(self.Assembly[class_name][method_name])
 				self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
 
 if __name__=='__main__':
