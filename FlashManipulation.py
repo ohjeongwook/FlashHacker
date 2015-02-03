@@ -193,13 +193,19 @@ class ASASM:
 					jumped=False
 				in_code=False
 
+				if self.DebugMethods>0:
+					print refid
+					pprint.pprint(blocks)
+					pprint.pprint(maps)
+					print ''
+
 				#Convert blocks, maps
 				name2id_maps={}
 				id2name_maps={}
 
 				blocks_by_id={}
-				id=0
 				for (block_name,instructions) in blocks.items():
+					id=int(block_name[1:])
 					name2id_maps[block_name]=id
 					id2name_maps[id]=block_name
 					diasm_lines=''
@@ -217,7 +223,6 @@ class ASASM:
 							diasm_lines+='%s %s\n' % (keyword,parameter_line)
 
 					blocks_by_id[id]=[0,diasm_lines]
-					id+=1
 
 				maps_by_id={}
 				for (src_block_name,target_block_names) in maps.items():
@@ -225,6 +230,12 @@ class ASASM:
 					for target_block_name in target_block_names:
 						target_ids.append(name2id_maps[target_block_name])
 					maps_by_id[name2id_maps[src_block_name]]=target_ids
+
+				if self.DebugMethods>0:
+					pprint.pprint(blocks_by_id)
+					pprint.pprint(maps_by_id)
+					pprint.pprint(id2name_maps)
+					print ''
 
 				methods[refid]=[blocks_by_id,maps_by_id,id2name_maps]
 
@@ -262,53 +273,54 @@ class ASASM:
 						jumped=False
 					block_name=keyword[0:-1]
 
-				elif keyword[0:2]=='if' or keyword=='jump':
+				elif keyword:
 					instructions.append([keyword,parameter])
-
-					if self.DebugMethods>0:
-						print '* New block %s (end of a block)' % block_name
-					if len(instructions)>0:
-						if last_block_name and not jumped:
-							if self.DebugMethods>0:
-								print '%s -> %s' % (last_block_name,block_name)
-							if not maps.has_key(last_block_name):
-								maps[last_block_name]=[block_name]
-							else:
-								maps[last_block_name].append(block_name)
-
-						blocks[block_name]=instructions
-
-						if not maps.has_key(block_name):
-							maps[block_name]=[parameter]
-						else:
-							maps[block_name].append(parameter)
+					instruction_count+=1
+					if keyword[0:2]=='if' or keyword=='jump':
 
 						if self.DebugMethods>0:
-							pprint.pprint(instructions)
-							print '%s -> %s' % (block_name,parameter)
-							print ''
+							print '* New block %s (end of a block)' % block_name
+
+						if len(instructions)>0:
+							if last_block_name and not jumped:
+								if self.DebugMethods>0:
+									print '%s -> %s' % (last_block_name,block_name)
+								if not maps.has_key(last_block_name):
+									maps[last_block_name]=[block_name]
+								else:
+									maps[last_block_name].append(block_name)
+
+							blocks[block_name]=instructions
+
+							if not maps.has_key(block_name):
+								maps[block_name]=[parameter]
+							else:
+								maps[block_name].append(parameter)
+
+							if self.DebugMethods>0:
+								pprint.pprint(instructions)
+								print '%s -> %s' % (block_name,parameter)
+								print ''
+
+
+						last_block_name=block_name
+						block_name="L%.2d" % instruction_count
+
 						instructions=[]
 						jumped=False
 
-					block_number+=1
-					last_block_name=block_name
-					block_name="Block%.2d" % block_number
-
-					if keyword=='jump':
-						jumped=True
-
-				elif keyword:
-					instructions.append([keyword,parameter])
+						if keyword=='jump':
+							jumped=True
 
 			if keyword=='code':
 				if self.DebugMethods>0:
 					print refid
 				in_code=True
 				instructions=[]
+				instruction_count=0
 				blocks={}
 				maps={}
-				block_number=0
-				block_name="Block%.2d" % block_number
+				block_name="L0"
 				last_block_name=''
 				jumped=False
 
@@ -363,14 +375,17 @@ class ASASM:
 
 		return asasm_files
 
+	def RetrieveFile(self,file):
+		parsed_lines=self.ReadFile(file)
+		methods=self.RetrieveMethod(parsed_lines)
+		return methods
+
 	def RetrieveAssembly(self,folder):
 		files={}
 		for relative_file in self.EnumDir(folder):
 			file=os.path.join(folder, relative_file)
 
-			parsed_lines=self.ReadFile(file)
-			methods=self.RetrieveMethod(parsed_lines)
-
+			methods=self.RetrieveFile(file)
 			if self.DebugMethods>0:
 				pprint.pprint(methods)
 			files[relative_file]=methods
@@ -481,5 +496,7 @@ if __name__=='__main__':
 
 	elif options.dump:
 		asasm=ASASM()
+		asasm.DebugMethods=0
 		files=asasm.RetrieveAssembly(dir)
 		pprint.pprint(files)
+		#asasm.RetrieveFile(os.path.join(dir,'.\\_a_-_-_.class.asasm'))
