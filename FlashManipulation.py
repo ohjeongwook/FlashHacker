@@ -126,7 +126,7 @@ class ASASM:
 		fd.close()
 		return parsed_lines
 
-	def WriteFile(self,filename, parsed_lines):
+	def WriteToFile(self,filename, parsed_lines):
 		fd=open(filename,'w')
 		for [prefix,keyword,parameter,comment] in parsed_lines:
 			line=prefix+keyword
@@ -138,6 +138,22 @@ class ASASM:
 			line+='\n'
 			fd.write(line)
 		fd.close()
+
+	def WriteToFiles(self,assemblies,target_dir,update_parsed_lines=True):
+		for (file,(parsed_lines,methods)) in assemblies.items():
+			if update_parsed_lines:
+				for (refid,(blocks,maps,labels)) in methods.items():
+					code_parsed_lines=asasm.ConstructCode(blocks,labels)
+					parsed_lines=asasm.ReplaceCode(parsed_lines,refid,code_parsed_lines)
+			new_filename=os.path.join(target_dir,file)
+
+			new_folder=os.path.dirname(new_filename)
+			if not os.path.isdir(new_folder):
+				try:
+					os.makedirs(new_folder)
+				except:
+					pass
+			asasm.WriteToFile(new_filename, parsed_lines)
 
 	DebugReplace=0
 	def ReplaceSymbol(self,parsed_lines,orig,replace):
@@ -364,7 +380,7 @@ class ASASM:
 		return [parsed_lines,methods]
 
 	def RetrieveAssembly(self,folder,target_file='',target_method=''):
-		files={}
+		assemblies={}
 		for relative_file in self.EnumDir(folder):
 			if target_file=='' or target_file==relative_file:
 				file=os.path.join(folder, relative_file)
@@ -372,9 +388,9 @@ class ASASM:
 				[parsed_lines,methods]=self.RetrieveFile(file,target_method)
 				if self.DebugMethods>0:
 					pprint.pprint(methods)
-				files[relative_file]=[parsed_lines,methods]
+				assemblies[relative_file]=[parsed_lines,methods]
 
-		return files
+		return assemblies
 
 	def ConstructCode(self,blocks,labels):
 		ids=blocks.keys()
@@ -398,6 +414,20 @@ class ASASM:
 
 		return parsed_lines
 
+	def EnumDir(self,root_dir,dir='.'):
+		files=dircache.listdir(os.path.join(root_dir,dir))
+		asasm_files=[]
+		for file in files:
+			relative_path=os.path.join(dir,file)
+			full_path=os.path.join(root_dir,relative_path)
+			if file[-6:]=='.asasm':
+				asasm_files.append(relative_path)
+			if os.path.isdir(full_path):
+				asasm_files+=self.EnumDir(root_dir,relative_path)
+
+		return asasm_files
+
+	DebugMethodTrace=1
 	def AddMethodTrace(self,parsed_lines):
 		parents=[]
 		new_parsed_lines=[]
@@ -427,76 +457,35 @@ class ASASM:
 
 				new_parsed_lines.append([prefix,keyword,parameter,comment])
 				if parents[-3][0]=='method':
+					if self.DebugMethodTrace>0:
+						print 'Adding trace', description
 					new_parsed_lines.append([prefix + ' ','findpropstrict','QName(PackageNamespace(""), "trace")',''])
-					new_parsed_lines.append([prefix + ' ','pushstring','%s' % description,''])
+					new_parsed_lines.append([prefix + ' ','pushstring','"%s"' % description,''])
 					new_parsed_lines.append([prefix + ' ','callpropvoid','QName(PackageNamespace(""), "trace"), 1',''])
 			else:
 				new_parsed_lines.append([prefix,keyword,parameter,comment])
 		return new_parsed_lines
 
-	def EnumDir(self,root_dir,dir='.'):
-		files=dircache.listdir(os.path.join(root_dir,dir))
-		asasm_files=[]
-		for file in files:
-			relative_path=os.path.join(dir,file)
-			full_path=os.path.join(root_dir,relative_path)
-			if file[-6:]=='.asasm':
-				asasm_files.append(relative_path)
-			if os.path.isdir(full_path):
-				asasm_files+=self.EnumDir(root_dir,relative_path)
+	def AddMethodTraces(self,dir,target_dir):
+		assemblies=asasm.RetrieveAssembly(dir)
+		for file in assemblies.keys():
+			assemblies[file][0]=self.AddMethodTrace(assemblies[file][0])
 
-		return asasm_files
+			if self.DebugMethodTrace>0:
+				print '='*80
+				pprint.pprint(assemblies[file][0])
+				print ''
 
-	def Instrument(self,folder,new_root_folder):
-		if not os.path.isdir(new_root_folder):
-			try:
-				os.makedirs(new_root_folder)
-			except:
-				pass
+		asasm.WriteToFiles(assemblies,target_dir,update_parsed_lines=False)
 
-		for relative_file in self.EnumDir(folder):
-			file=os.path.join(folder, relative_file)
-
-			parsed_lines=self.ReadFile(file)
-
-			new_folder=os.path.join(new_root_folder, os.path.dirname(relative_file))
-
-			if not os.path.isdir(new_folder):
-				try:
-					os.makedirs(new_folder)
-				except:
-					pass
-
-			basename=os.path.basename(file)
-			new_filename=os.path.join(new_folder,basename)
-			filename_replaced=False
-
-			"""
+		"""
 			for [orig,replace] in replace_patterns:
 				parsed_lines=self.ReplaceSymbol(parsed_lines,orig,replace)
 
 				if not filename_replaced and basename.find(orig)>=0:
 					new_filename=os.path.join(new_folder,basename.replace(orig,replace))
 					filename_replaced=True
-			"""
-
-			parsed_lines=self.AddMethodTrace(parsed_lines)
-			self.WriteFile(new_filename, parsed_lines)
-
-	def WriteFiles(self,files,target_dir):
-		for (file,(parsed_lines,methods)) in files.items():
-			for (refid,(blocks,maps,labels)) in methods.items():
-				code_parsed_lines=asasm.ConstructCode(blocks,labels)
-				parsed_lines=asasm.ReplaceCode(parsed_lines,refid,code_parsed_lines)
-			new_filename=os.path.join(target_dir,file)
-
-			new_folder=os.path.dirname(new_filename)
-			if not os.path.isdir(new_folder):
-				try:
-					os.makedirs(new_folder)
-				except:
-					pass
-			asasm.WriteFile(new_filename, parsed_lines)
+		"""
 
 if __name__=='__main__':
 	from optparse import OptionParser
@@ -523,9 +512,9 @@ if __name__=='__main__':
 
 			file='.\\_a_-_-_.class.asasm'
 			method='_a_-_-_/instance/_a_-_-_/instance/_a_-__-'
-			files=asasm.RetrieveAssembly(dir,file,method)
+			assemblies=asasm.RetrieveAssembly(dir,file,method)
 
-			[disasms,links,address2name]=asasm.ConvertMapsToPrintable(files[file][1][method])
+			[disasms,links,address2name]=asasm.ConvertMapsToPrintable(assemblies[file][1][method])
 			self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
 
 
@@ -534,11 +523,16 @@ if __name__=='__main__':
 	parser.add_option("-r","--replace",dest="replace",action="store_true",default=False)
 	parser.add_option("-c","--reconstruct",dest="reconstruct",action="store_true",default=False)
 	parser.add_option("-d","--dump",dest="dump",action="store_true",default=False)
+	parser.add_option("-m","--method",dest="method",action="store_true",default=False)
 	(options,args)=parser.parse_args()
 
+	print args
 	dir=''
-	if len(sys.argv)>1:
+	target_dir=''
+	if len(args)>0:
 		dir=args[0]
+		if len(args)>1:
+			target_dir=args[1]
 
 	if options.graph:
 		app=QApplication(sys.argv)
@@ -569,17 +563,17 @@ if __name__=='__main__':
 	elif options.dump:
 		asasm=ASASM()
 		asasm.DebugMethods=0
-		files=asasm.RetrieveAssembly(dir)
-		pprint.pprint(files)
+		assemblies=asasm.RetrieveAssembly(dir)
+		pprint.pprint(assemblies)
 		#asasm.RetrieveFile(os.path.join(dir,'.\\_a_-_-_.class.asasm'))
 
 	elif options.reconstruct:
-		target_dir=''
-		if len(sys.argv)>2:
-			target_dir=args[1]
 		asasm=ASASM()
 		asasm.DebugMethods=0
 		
-		files=asasm.RetrieveAssembly(dir)
-		asasm.WriteFiles(files,target_dir)
+		assemblies=asasm.RetrieveAssembly(dir)
+		asasm.WriteToFiles(assemblies,target_dir)
 
+	elif options.method:
+		asasm=ASASM()
+		asasm.AddMethodTraces(dir,target_dir)
