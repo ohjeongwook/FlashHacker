@@ -43,11 +43,14 @@ class ASASM:
 
 		return [prefix,keyword,parameter,comment]
 
-	def ParseNameNotation(self,line):
+	DebugParseNameNotation=0
+	def ParseNameNotation(self,line,depth=0):
 		main_str=''
 		parameters=[]
 		parameter=''
 		level=0
+		index=0
+		end_of_data=False
 		for ch in line:
 			if level==0 and main_str=='' and ( ch==' ' or ch=='\t'):
 				continue
@@ -55,9 +58,13 @@ class ASASM:
 			if ch==')':
 				level-=1
 
+				if depth==0 and level==0:
+					index+=1
+					break
+
 			if level>0:
 				if level==1 and ch==',':
-					parameters.append(self.ParseNameNotation(parameter))
+					parameters.append(self.ParseNameNotation(parameter,depth+1))
 					parameter=''
 				else:
 					parameter+=ch
@@ -68,14 +75,35 @@ class ASASM:
 			if level==0 and ch!=')':
 				main_str+=ch
 
+			index+=1
+
 		if parameter:
-			parameters.append(self.ParseNameNotation(parameter))
+			parameters.append(self.ParseNameNotation(parameter,depth+1))
 
 
 		if len(parameters)>0:
-			return {'type':main_str,'parameters':parameters}
+			ret={'type':main_str,'parameters':parameters}
 		else:
-			return {'constant':main_str}
+			ret={'constant':main_str}
+
+
+		if depth==0:
+			leftover=line[index:]
+			if leftover:
+				if self.DebugParseNameNotation>0:
+					print 'leftover', line[index:]
+
+				arg_count_str=''
+				found_separator=False
+				for ch in line[index:]:
+					if ch==',':
+						found_separator=True
+					elif found_separator and ch!=' ' and ch!='\t' and ch!='\n' and ch!='\r':
+						arg_count_str+=ch
+
+				ret['arg_count']=int(arg_count_str)
+
+		return ret
 
 	def GetName(self,line):
 		ret=asasm.ParseNameNotation(line)
@@ -253,55 +281,76 @@ class ASASM:
 			if keyword in self.BlockKeywords:
 				if parameter[-3:]!='end':
 					parents.append([keyword,parameter])
-			elif keyword=='end':
-				del parents[-1]
 
+					if keyword=='code' and (target_method=='' or target_method==refid):
+						if self.DebugMethods>0:
+							print refid
+						instructions=[]
+						instruction_count=0
+						blocks={}
+						maps={}
+						labels={}
+
+						block_name=0
+						last_block_name=None
+						is_last_instruction_jmp=False
+				continue
+
+			elif keyword=='end':
+				parent_name=parents[-1][0]
+				if parent_name=='code' and (target_method=='' or target_method==refid):
+					if self.DebugMethods>0:
+						print '* New block %s (end of code)' % block_name
+
+					if len(instructions)>0:
+						if last_block_name and not is_last_instruction_jmp:
+							if self.DebugMethods>0:
+								print '%s -> %s' % (last_block_name,block_name)
+							if not maps.has_key(last_block_name):
+								maps[last_block_name]=[block_name]
+							else:
+								if not block_name in maps[last_block_name]:
+									maps[last_block_name].append(block_name)
+
+						blocks[block_name]=instructions
+						if self.DebugMethods>0:
+							pprint.pprint(instructions)
+							print ''
+						instructions=[]
+						is_last_instruction_jmp=False
+
+					if self.DebugMethods>0:
+						print refid
+						pprint.pprint(blocks)
+						pprint.pprint(maps)
+						print ''
+
+					methods[refid]=[blocks,maps,labels,type]
+
+					if self.DebugMethods>0:
+						print '='*80
+						pprint.pprint(blocks)
+						pprint.pprint(maps)
+						print ''
+
+					blocks={}
+					maps={}
+					labels={}
+					code_parsed_line=[]
+
+				del parents[-1]
+				continue
+
+			if len(parents)==0:
+				continue
+
+			parent_name=parents[-1][0]
 			if keyword=='refid':
 				refid=parameter[1:-1]
-				type=parents[-1][0]
-
-			if keyword=='end' and in_code:
-				if self.DebugMethods>0:
-					print '* New block %s (end of code)' % block_name
-
-				if len(instructions)>0:
-					if last_block_name and not is_last_instruction_jmp:
-						if self.DebugMethods>0:
-							print '%s -> %s' % (last_block_name,block_name)
-						if not maps.has_key(last_block_name):
-							maps[last_block_name]=[block_name]
-						else:
-							if not block_name in maps[last_block_name]:
-								maps[last_block_name].append(block_name)
-
-					blocks[block_name]=instructions
-					if self.DebugMethods>0:
-						pprint.pprint(instructions)
-						print ''
-					instructions=[]
-					is_last_instruction_jmp=False
-
-				in_code=False
-
-				if self.DebugMethods>0:
-					print refid
-					pprint.pprint(blocks)
-					pprint.pprint(maps)
-					print ''
-
-				methods[refid]=[blocks,maps,labels,type]
-
-				if self.DebugMethods>0:
-					print '='*80
-					pprint.pprint(blocks)
-					pprint.pprint(maps)
-					print ''
-
-				blocks={}
-				maps={}
-				labels={}
-
-			if in_code:
+				type=parent_name
+				continue
+				
+			if parent_name=='code':
 				if keyword[-1:]==":":
 					if len(instructions)>0:
 						if self.DebugMethods>0:
@@ -366,20 +415,6 @@ class ASASM:
 						is_last_instruction_jmp=True
 					else:
 						is_last_instruction_jmp=False
-
-			if keyword=='code' and (target_method=='' or target_method==refid):
-				if self.DebugMethods>0:
-					print refid
-				in_code=True
-				instructions=[]
-				instruction_count=0
-				blocks={}
-				maps={}
-				labels={}
-
-				block_name=0
-				last_block_name=None
-				is_last_instruction_jmp=False
 
 		return methods
 
@@ -500,21 +535,48 @@ class ASASM:
 			methods[refid]=(blocks,maps,labels,type)
 		return methods
 
+	DebugAddAPITrace=1
 	def AddAPITrace(self,methods,filename=''):
 		for refid in methods.keys():
 			(blocks,maps,labels,type)=methods[refid]
 			for block_id in blocks.keys():
-				if self.DebugBasicBlockTrace>0:
+				if self.DebugAddAPITrace>1:
 					print "="*80
 					print ' %d' % block_id
 					for line in blocks[block_id]:
 						print line
 					print ''
 
-				if self.DebugBasicBlockTrace >0:
-					print 'Instrumenting',type,refid
+				if self.DebugAddAPITrace >1:
+					print '* Instrumenting',type,refid
 
 				if type=='method':
+					max_stack_count=0
+					for (keyword,parameter) in blocks[block_id]:
+						if keyword[0:4]=='call':
+							stack_count=0
+							if keyword in ['call']:
+								pass
+							elif keyword in ['callmethod', 'callproperty', 'callproplex', 'callpropvoid', 'callstatic', 'callsuper', 'callsupervoid']:
+								stack_count+=1
+
+							parsed_notation=self.ParseNameNotation(parameter)
+							if parsed_notation.has_key('arg_count'):
+									stack_count+=parsed_notation['arg_count']
+
+							if self.DebugAddAPITrace >0:
+								print '* ',type,refid
+								print keyword, parameter
+								if parsed_notation.has_key('arg_count'):
+									print parsed_notation['arg_count']
+									print ''
+
+								if stack_count>max_stack_count:
+									max_stack_count=stack_count
+
+					if self.DebugAddAPITrace >0:
+						print "Max stack count:", type, refid, max_stack_count
+
 					new_blocks=[]
 					for (keyword,parameter) in blocks[block_id]:
 						if keyword[0:4]=='call':
