@@ -515,11 +515,16 @@ class ASASM:
 					print 'Instrumenting',type,refid
 
 				if type=='method':
-					trace_code=[]
-					trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
-					trace_code.append(['pushstring','"%s\t%s\t%s"' % (filename,refid,labels[block_id])])
-					trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
-					blocks[block_id][0:0]=trace_code
+					new_blocks=[]
+					for (keyword,parameter) in blocks[block_id]:
+						if keyword[0:4]=='call':
+							new_blocks.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+							escaped_parameter=parameter.replace('"','\\"')
+							new_blocks.append(['pushstring','"%s\t%s -> %s %s"' % (filename,refid,keyword,escaped_parameter)])
+							new_blocks.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])			
+						new_blocks.append([keyword,parameter])	
+
+					blocks[block_id]=new_blocks
 
 			methods[refid]=(blocks,maps,labels,type)
 		return methods
