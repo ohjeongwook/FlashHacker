@@ -139,12 +139,18 @@ class ASASM:
 			fd.write(line)
 		fd.close()
 
-	def WriteToFiles(self,assemblies,target_dir,update_parsed_lines=True):
+	def UpdateParsedLines(self,assemblies):
+		for file in assemblies.keys():
+			(parsed_lines,methods)=assemblies[file]
+			for (refid,(blocks,maps,labels,type)) in methods.items():
+				code_parsed_lines=asasm.ConstructCode(blocks,labels)
+				parsed_lines=asasm.ReplaceCode(parsed_lines,refid,code_parsed_lines)
+
+			assemblies[file][0]=parsed_lines
+		return assemblies
+
+	def WriteToFiles(self,assemblies,target_dir):
 		for (file,(parsed_lines,methods)) in assemblies.items():
-			if update_parsed_lines:
-				for (refid,(blocks,maps,labels,type)) in methods.items():
-					code_parsed_lines=asasm.ConstructCode(blocks,labels)
-					parsed_lines=asasm.ReplaceCode(parsed_lines,refid,code_parsed_lines)
 			new_filename=os.path.join(target_dir,file)
 
 			new_folder=os.path.dirname(new_filename)
@@ -481,7 +487,7 @@ class ASASM:
 						print line
 					print ''
 
-				if self.DebugBasicBlockTrace >-1:
+				if self.DebugBasicBlockTrace >0:
 					print 'Instrumenting',type,refid
 
 				if type=='method' and labels.has_key(block_id) and blocks[block_id][0][0]!='label':
@@ -494,23 +500,42 @@ class ASASM:
 			methods[refid]=(blocks,maps,labels,type)
 		return methods
 
-	def Instrument(self,dir,target_dir,operations=[],replace_patterns=[]):
-		assemblies=asasm.RetrieveAssembly(dir)
-		update_parsed_lines=False
-		for file in assemblies.keys():
-			if "AddMethodTraces" in operations:
-				assemblies[file][0]=self.AddMethodTrace(assemblies[file][0])
-				
-				if self.DebugMethodTrace>0:
-					print '='*80
-					pprint.pprint(assemblies[file][0])
+	def AddAPITrace(self,methods,filename=''):
+		for refid in methods.keys():
+			(blocks,maps,labels,type)=methods[refid]
+			for block_id in blocks.keys():
+				if self.DebugBasicBlockTrace>0:
+					print "="*80
+					print ' %d' % block_id
+					for line in blocks[block_id]:
+						print line
 					print ''
 
-			elif "AddBasicBlockTraces" in operations:
-				update_parsed_lines=True
-				assemblies[file][1]=self.AddBasicBlockTrace(assemblies[file][1],filename=file)
+				if self.DebugBasicBlockTrace >0:
+					print 'Instrumenting',type,refid
 
-			elif "Replace" in operations:
+				if type=='method':
+					trace_code=[]
+					trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+					trace_code.append(['pushstring','"%s\t%s\t%s"' % (filename,refid,labels[block_id])])
+					trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
+					blocks[block_id][0:0]=trace_code
+
+			methods[refid]=(blocks,maps,labels,type)
+		return methods
+
+	def Instrument(self,dir,target_dir,operations=[],replace_patterns=[]):
+		assemblies=asasm.RetrieveAssembly(dir)
+		for file in assemblies.keys():
+			if "AddBasicBlockTraces" in operations:
+				assemblies[file][1]=self.AddBasicBlockTrace(assemblies[file][1],filename=file)
+				assemblies=self.UpdateParsedLines(assemblies)
+
+			if "AddAPITraces" in operations:
+				assemblies[file][1]=self.AddAPITrace(assemblies[file][1],filename=file)
+				assemblies=self.UpdateParsedLines(assemblies)
+
+			if "Replace" in operations:
 				for [orig,replace] in replace_patterns:
 					parsed_lines=self.ReplaceSymbol(parsed_lines,orig,replace)
 					"""
@@ -519,7 +544,15 @@ class ASASM:
 						filename_replaced=True
 					"""
 
-		asasm.WriteToFiles(assemblies,target_dir,update_parsed_lines=update_parsed_lines)
+			if "AddMethodTraces" in operations:
+				assemblies[file][0]=self.AddMethodTrace(assemblies[file][0])
+
+				if self.DebugMethodTrace>0:
+					print '='*80
+					pprint.pprint(assemblies[file][0])
+					print ''
+
+		asasm.WriteToFiles(assemblies,target_dir)
 
 if __name__=='__main__':
 	from optparse import OptionParser
@@ -559,6 +592,7 @@ if __name__=='__main__':
 	parser.add_option("-d","--dump",dest="dump",action="store_true",default=False)
 	parser.add_option("-m","--method",dest="method",action="store_true",default=False)
 	parser.add_option("-b","--basic_blocks",dest="basic_blocks",action="store_true",default=False)
+	parser.add_option("-a","--api",dest="api",action="store_true",default=False)
 	(options,args)=parser.parse_args()
 
 	dir=''
@@ -616,3 +650,6 @@ if __name__=='__main__':
 		asasm=ASASM()
 		asasm.Instrument(dir,target_dir,["AddBasicBlockTraces"])
 
+	elif options.api:
+		asasm=ASASM()
+		asasm.Instrument(dir,target_dir,["AddAPITraces"])
