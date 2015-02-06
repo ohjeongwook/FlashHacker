@@ -1,0 +1,29 @@
+script ; 0
+ sinit
+  refid "Util/init"
+  body
+   maxstack 2
+   localcount 1
+   initscopedepth 1
+   maxscopedepth 3
+   code
+    getlocal0
+    pushscope
+
+    getscopeobject      0
+    getlex              QName(PackageNamespace(""), "Object")
+    pushscope
+
+    getlex              QName(PackageNamespace(""), "Object")
+    newclass            "Util"
+    popscope
+    initproperty        QName(PackageNamespace(""), "Util")
+
+    returnvoid
+   end ; code
+  end ; body
+ end ; method
+ trait class QName(PackageNamespace(""), "Util") slotid 1
+  #include "Util.class.asasm"
+ end ; trait
+end ; script

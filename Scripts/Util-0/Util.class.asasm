@@ -1,0 +1,380 @@
+class
+ refid "Util"
+ instance QName(PackageNamespace(""), "Util")
+  extends QName(PackageNamespace(""), "Object")
+  flag SEALED
+  flag PROTECTEDNS
+  protectedns ProtectedNamespace("Util")
+  iinit
+   refid "Util/instance/init"
+   body
+    maxstack 1
+    localcount 1
+    initscopedepth 4
+    maxscopedepth 5
+    code
+     getlocal0
+     pushscope
+
+     getlocal0
+     constructsuper      0
+
+     returnvoid
+    end ; code
+   end ; body
+  end ; method
+  trait method QName(PackageNamespace(""), "Test")
+   method
+    refid "Util/instance/Test"
+    returns QName(PackageNamespace(""), "void")
+    body
+     maxstack 2
+     localcount 3
+     initscopedepth 4
+     maxscopedepth 5
+     code
+      getlocal0
+      pushscope
+
+      pushstring          "Test"
+      setlocal1
+
+      findpropstrict      QName(PackageNamespace(""), "Array")
+      constructprop       QName(PackageNamespace(""), "Array"), 0
+      coerce              QName(PackageNamespace(""), "Array")
+      setlocal2
+
+      getlocal2
+      getlocal1
+      callpropvoid        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "push"), 1
+
+      returnvoid
+     end ; code
+    end ; body
+   end ; method
+  end ; trait
+ end ; instance
+ cinit
+  refid "Util/class/init"
+  body
+   maxstack 1
+   localcount 1
+   initscopedepth 3
+   maxscopedepth 4
+   code
+    getlocal0
+    pushscope
+
+    returnvoid
+   end ; code
+  end ; body
+ end ; method
+ trait method QName(PackageNamespace(""), "DumpArray") flag FINAL dispid 3
+  method
+   refid "Util/class/DumpArray"
+   param QName(PackageNamespace(""), "String")
+   param QName(PackageNamespace(""), "String")
+   param QName(PackageNamespace(""), "String")
+   param QName(PackageNamespace(""), "Array")
+   returns QName(PackageNamespace(""), "void")
+   body
+    maxstack 3
+    localcount 6
+    initscopedepth 3
+    maxscopedepth 4
+    code
+     getlocal0
+     pushscope
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     pushstring          "*** DumpArray"
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     getlocal1
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     getlocal2
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     getlocal3
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     pushbyte            0
+     setlocal            5
+
+     jump                L24
+
+L17:
+     label
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     getlocal            4
+     getlocal            5
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PrivateNamespace(null, "Util/class/DumpArray"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.utils"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     inclocal_i          5
+L24:
+     getlocal            5
+     getlocal            4
+     getproperty         QName(PackageNamespace(""), "length")
+     iflt                L17
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     pushstring          ""
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     returnvoid
+    end ; code
+   end ; body
+  end ; method
+ end ; trait
+ trait method QName(PackageNamespace(""), "DumpByteArray") flag FINAL dispid 4
+  method
+   refid "Util/class/DumpByteArray"
+   param QName(PackageNamespace("flash.utils"), "ByteArray")
+   returns QName(PackageNamespace(""), "String")
+   body
+    maxstack 5
+    localcount 11
+    initscopedepth 3
+    maxscopedepth 4
+    code
+     getlocal0
+     pushscope
+
+     pushbyte            0
+     setlocal            7
+
+     pushnull
+     coerce_s
+     setlocal            8
+
+     pushbyte            0
+     setlocal            9
+
+     pushbyte            0
+     setlocal            10
+
+     findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
+     pushstring          "Offset"
+     pushbyte            8
+     pushstring          " "
+     callproperty        QName(PrivateNamespace(null, "Util/class"), "fillUp"), 3
+     pushstring          "  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n"
+     add
+     setlocal2
+
+     pushbyte            0
+     setlocal3
+
+     getlocal1
+     getproperty         QName(PackageNamespace(""), "length")
+     convert_i
+     setlocal            4
+
+     pushstring          ""
+     setlocal            5
+
+     getlocal1
+     pushbyte            0
+     setproperty         QName(PackageNamespace(""), "position")
+
+     pushbyte            0
+     setlocal            6
+
+     jump                L128
+
+L33:
+     label
+     getlocal            5
+     findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
+     getlocal3
+     pushbyte            16
+     callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "toString"), 1
+     callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "toUpperCase"), 0
+     pushbyte            8
+     pushstring          "0"
+     callproperty        QName(PrivateNamespace(null, "Util/class"), "fillUp"), 3
+     pushstring          "  "
+     add
+     add
+     coerce_s
+     setlocal            5
+
+     getlex              QName(PackageNamespace(""), "Math")
+     pushbyte            16
+     getlocal1
+     getproperty         QName(PackageNamespace(""), "length")
+     getlocal1
+     getproperty         QName(PackageNamespace(""), "position")
+     subtract
+     callproperty        QName(PackageNamespace(""), "min"), 2
+     convert_i
+     setlocal            7
+
+     pushstring          ""
+     setlocal            8
+
+     pushbyte            0
+     setlocal            9
+
+     jump                L111
+
+L63:
+     label
+     getlocal            9
+     getlocal            7
+     ifnlt               L102
+
+     getlocal1
+     callproperty        QName(PackageNamespace(""), "readUnsignedByte"), 0
+     convert_i
+     setlocal            10
+
+     getlocal            8
+     getlocal            10
+     pushbyte            32
+     greaterequals
+     iffalse             L81
+
+     getlex              QName(PackageNamespace(""), "String")
+     getlocal            10
+     callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "fromCharCode"), 1
+     coerce_a
+     jump                L83
+
+L81:
+     pushstring          "."
+     coerce_a
+L83:
+     add
+     coerce_s
+     setlocal            8
+
+     getlocal            5
+     findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
+     getlocal            10
+     pushbyte            16
+     callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "toString"), 1
+     callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "toUpperCase"), 0
+     pushbyte            2
+     pushstring          "0"
+     callproperty        QName(PrivateNamespace(null, "Util/class"), "fillUp"), 3
+     pushstring          " "
+     add
+     add
+     coerce_s
+     setlocal            5
+
+     inclocal_i          3
+     jump                L110
+
+L102:
+     getlocal            5
+     pushstring          "\x09"
+     add
+     setlocal            5
+
+     getlocal            8
+     pushstring          " "
+     add
+     setlocal            8
+
+L110:
+     inclocal_i          9
+L111:
+     getlocal            9
+     pushbyte            16
+     iflt                L63
+
+     getlocal            5
+     pushstring          " "
+     getlocal            8
+     add
+     pushstring          "\n"
+     add
+     add
+     coerce_s
+     setlocal            5
+
+     getlocal            6
+     pushbyte            15
+     add
+     convert_i
+     setlocal            6
+
+L128:
+     getlocal            6
+     getlocal            4
+     iflt                L33
+
+     getlocal2
+     getlocal            5
+     add
+     coerce_s
+     setlocal2
+
+     getlocal2
+     returnvalue
+    end ; code
+   end ; body
+  end ; method
+ end ; trait
+ trait method QName(PrivateNamespace(null, "Util/class"), "fillUp") flag FINAL dispid 5
+  method
+   refid "Util/class/Util/class/fillUp"
+   param QName(PackageNamespace(""), "String")
+   param QName(PackageNamespace(""), "int")
+   param QName(PackageNamespace(""), "String")
+   returns QName(PackageNamespace(""), "String")
+   body
+    maxstack 2
+    localcount 6
+    initscopedepth 3
+    maxscopedepth 4
+    code
+     getlocal0
+     pushscope
+
+     getlocal2
+     getlocal1
+     getproperty         QName(PackageNamespace(""), "length")
+     subtract
+     convert_i
+     setlocal            4
+
+     pushstring          ""
+     setlocal            5
+
+     jump                L17
+
+L11:
+     label
+     getlocal            5
+     getlocal3
+     add
+     coerce_s
+     setlocal            5
+
+L17:
+     getlocal            4
+     decrement_i
+     dup
+     convert_i
+     setlocal            4
+
+     pushbyte            255
+     ifgt                L11
+
+     getlocal            5
+     getlocal1
+     add
+     returnvalue
+    end ; code
+   end ; body
+  end ; method
+ end ; trait
+end ; class
