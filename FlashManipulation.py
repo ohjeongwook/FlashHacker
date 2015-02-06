@@ -2,6 +2,7 @@ import sys
 import dircache
 import os
 import pprint
+from copy import *
 
 from Graphs import *
 import FlowGrapher
@@ -167,16 +168,6 @@ class ASASM:
 			fd.write(line)
 		fd.close()
 
-	def UpdateParsedLines(self,assemblies):
-		for file in assemblies.keys():
-			(parsed_lines,methods)=assemblies[file]
-			for (refid,(blocks,maps,labels,type)) in methods.items():
-				code_parsed_lines=asasm.ConstructCode(blocks,labels)
-				parsed_lines=asasm.ReplaceCode(parsed_lines,refid,code_parsed_lines)
-
-			assemblies[file][0]=parsed_lines
-		return assemblies
-
 	def WriteToFiles(self,assemblies,target_dir):
 		for (file,(parsed_lines,methods)) in assemblies.items():
 			new_filename=os.path.join(target_dir,file)
@@ -203,7 +194,7 @@ class ASASM:
 			index+=1
 		return parsed_lines
 
-	def ConvertMapsToPrintable(self,(blocks,maps,labels,type)):
+	def ConvertMapsToPrintable(self,(blocks,maps,labels,parents,body_parameters)):
 		#Convert blocks,maps
 		name2id_maps={}
 		id2name_maps={}
@@ -243,31 +234,87 @@ class ASASM:
 			print ''
 		return [blocks_by_id,maps_by_id,id2name_maps]
 
-	def ReplaceCode(self,parsed_lines,target_refid,code_parsed_lines):
+	DebugReplaceParsedLines=0
+	def ReplaceParsedLines(self,parsed_lines,target_refid,code_parsed_lines,type):
 		start_index=0
+		start_level=0
 		end_index=0
 		index=0
+		level=0
 		for [prefix,keyword,parameter,comment] in parsed_lines:
 			if keyword=='refid':
 				refid=parameter[1:-1]
+			elif keyword in self.BlockKeywords:
+				if keyword==type:
+					if refid==target_refid:
+						start_index=index+1
+						start_level=level
 
-			if keyword=='code':
-				if refid==target_refid:
-					start_index=index+1
-
+				level+=1
 			elif keyword=='end':
-				if start_index>0:
+				if start_index>0 and start_level==level:
 					end_index=index-1
 					break
 
+				level-=1
+
 			index+=1
 
+		if self.DebugReplaceParsedLines>0:
+			print 'Replacing %d - %d ' % (start_index,end_index)
+			pprint.pprint(parsed_lines[start_index:end_index])
+			pprint.pprint(code_parsed_lines)
+			print ''
 		parsed_lines[start_index:end_index]=code_parsed_lines
 
 		return parsed_lines
 
+	def ConstructCode(self,blocks,labels):
+		ids=blocks.keys()
+		ids.sort()
+
+		parsed_lines=[]
+		label={}
+		for id in ids:
+			for (keyword,parameter) in blocks[id]:
+				if keyword[0:2]=='if' or keyword=='jump':
+					label[int(parameter[1:])]=1
+
+		for id in ids:
+			if labels.has_key(id):
+				parsed_lines.append(['',labels[id],'',''])
+			elif label.has_key(id):
+				parsed_lines.append(['','L%d:' % id,'',''])
+
+			for (keyword,parameter) in blocks[id]:
+				parsed_lines.append(['      ',keyword,parameter,''])
+
+		return parsed_lines
+
+	def UpdateParsedLines(self,assemblies):
+		for file in assemblies.keys():
+			(parsed_lines,methods)=assemblies[file]
+			for (refid,(blocks,maps,labels,parents,body_parameters)) in methods.items():
+				code_parsed_lines=asasm.ConstructCode(blocks,labels)
+				body_parameter_lines=[]
+				for (key,value) in body_parameters.items():
+					if key!='try':
+						body_parameter_lines.append(['',key,value,''])
+
+				body_parameter_lines.append(['','code','',''])
+				body_parameter_lines+=code_parsed_lines
+				body_parameter_lines.append(['','end','','code'])
+
+				if body_parameters.has_key('try'):
+					body_parameter_lines.append(['','try',body_parameters['try'],''])
+
+				parsed_lines=asasm.ReplaceParsedLines(parsed_lines,refid,body_parameter_lines,'body')
+
+			assemblies[file][0]=parsed_lines
+		return assemblies
+
 	DebugMethods=0
-	def RetrieveMethod(self,parsed_lines,target_method=''):
+	def ParseMethod(self,parsed_lines,target_method=''):
 		if self.DebugMethods>0:
 			print '-' * 80
 
@@ -275,25 +322,28 @@ class ASASM:
 		new_parsed_lines=[]
 		in_code=False
 		methods={}
-		type=''
 
 		for [prefix,keyword,parameter,comment] in parsed_lines:
 			if keyword in self.BlockKeywords:
 				if parameter[-3:]!='end':
 					parents.append([keyword,parameter])
 
-					if keyword=='code' and (target_method=='' or target_method==refid):
-						if self.DebugMethods>0:
-							print refid
-						instructions=[]
-						instruction_count=0
-						blocks={}
-						maps={}
-						labels={}
+					if target_method=='' or target_method==refid:
+						if keyword=='body':
+							body_parameters={}
 
-						block_name=0
-						last_block_name=None
-						is_last_instruction_jmp=False
+						if keyword=='code':
+							if self.DebugMethods>0:
+								print refid
+							instructions=[]
+							instruction_count=0
+							blocks={}
+							maps={}
+							labels={}
+
+							block_name=0
+							last_block_name=None
+							is_last_instruction_jmp=False
 				continue
 
 			elif keyword=='end':
@@ -325,7 +375,7 @@ class ASASM:
 						pprint.pprint(maps)
 						print ''
 
-					methods[refid]=[blocks,maps,labels,type]
+					methods[refid]=[blocks,maps,labels,deepcopy(parents),body_parameters]
 
 					if self.DebugMethods>0:
 						print '='*80
@@ -347,10 +397,12 @@ class ASASM:
 			parent_name=parents[-1][0]
 			if keyword=='refid':
 				refid=parameter[1:-1]
-				type=parent_name
 				continue
 				
-			if parent_name=='code':
+			if parent_name=='body':
+				body_parameters[keyword]=parameter
+
+			elif parent_name=='code':
 				if keyword[-1:]==":":
 					if len(instructions)>0:
 						if self.DebugMethods>0:
@@ -420,7 +472,7 @@ class ASASM:
 
 	def RetrieveFile(self,file,target_method=''):
 		parsed_lines=self.ReadFile(file)
-		methods=self.RetrieveMethod(parsed_lines,target_method)
+		methods=self.ParseMethod(parsed_lines,target_method)
 		return [parsed_lines,methods]
 
 	def RetrieveAssembly(self,folder,target_file='',target_method=''):
@@ -435,28 +487,6 @@ class ASASM:
 				assemblies[relative_file]=[parsed_lines,methods]
 
 		return assemblies
-
-	def ConstructCode(self,blocks,labels):
-		ids=blocks.keys()
-		ids.sort()
-
-		parsed_lines=[]
-		label={}
-		for id in ids:
-			for (keyword,parameter) in blocks[id]:
-				if keyword[0:2]=='if' or keyword=='jump':
-					label[int(parameter[1:])]=1
-
-		for id in ids:
-			if labels.has_key(id):
-				parsed_lines.append(['',labels[id],'',''])
-			elif label.has_key(id):
-				parsed_lines.append(['','L%d:' % id,'',''])
-
-			for (keyword,parameter) in blocks[id]:
-				parsed_lines.append(['      ',keyword,parameter,''])
-
-		return parsed_lines
 
 	def EnumDir(self,root_dir,dir='.'):
 		files=dircache.listdir(os.path.join(root_dir,dir))
@@ -513,7 +543,7 @@ class ASASM:
 	DebugBasicBlockTrace=0
 	def AddBasicBlockTrace(self,methods,filename=''):
 		for refid in methods.keys():
-			(blocks,maps,labels,type)=methods[refid]
+			(blocks,maps,labels,parents,body_parameters)=methods[refid]
 			for block_id in blocks.keys():
 				if self.DebugBasicBlockTrace >0:
 					print "="*80
@@ -522,23 +552,35 @@ class ASASM:
 						print line
 					print ''
 
-				if self.DebugBasicBlockTrace >0:
-					print 'Instrumenting',type,refid
+				if self.DebugBasicBlockTrace >-1:
+					print 'Instrumenting',refid,parents
 
-				if type=='method' and labels.has_key(block_id) and blocks[block_id][0][0]!='label':
+				if parents[-3][0]=='method' and labels.has_key(block_id) and blocks[block_id][0][0]!='label':
 					trace_code=[]
 					trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
 					trace_code.append(['pushstring','"%s\t%s\t%s"' % (filename,refid,labels[block_id])])
 					trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
 					blocks[block_id][0:0]=trace_code
 
-			methods[refid]=(blocks,maps,labels,type)
+			methods[refid]=(blocks,maps,labels,parents,body_parameters)
 		return methods
 
 	DebugAddAPITrace=1
+	def GetCallStackCount(self,keyword,parameter):
+		stack_count=0
+		if keyword in ['call']:
+			pass
+		elif keyword in ['callmethod', 'callproperty', 'callproplex', 'callpropvoid', 'callstatic', 'callsuper', 'callsupervoid']:
+			stack_count+=1
+
+		parsed_notation=self.ParseNameNotation(parameter)
+		if parsed_notation.has_key('arg_count'):
+			stack_count+=parsed_notation['arg_count']
+		return stack_count
+
 	def AddAPITrace(self,methods,filename=''):
 		for refid in methods.keys():
-			(blocks,maps,labels,type)=methods[refid]
+			(blocks,maps,labels,parents,body_parameters)=methods[refid]
 			for block_id in blocks.keys():
 				if self.DebugAddAPITrace>1:
 					print "="*80
@@ -547,77 +589,126 @@ class ASASM:
 						print line
 					print ''
 
-				if self.DebugAddAPITrace >1:
-					print '* Instrumenting',type,refid
+				if self.DebugAddAPITrace >-1:
+					print '* Instrumenting',refid,parents
 
-				if type=='method':
+				if parents[-3][0]=='method':
 					max_stack_count=0
+
 					for (keyword,parameter) in blocks[block_id]:
 						if keyword[0:4]=='call':
-							stack_count=0
-							if keyword in ['call']:
-								pass
-							elif keyword in ['callmethod', 'callproperty', 'callproplex', 'callpropvoid', 'callstatic', 'callsuper', 'callsupervoid']:
-								stack_count+=1
-
-							parsed_notation=self.ParseNameNotation(parameter)
-							if parsed_notation.has_key('arg_count'):
-									stack_count+=parsed_notation['arg_count']
-
+							stack_count=self.GetCallStackCount(keyword,parameter)
 							if self.DebugAddAPITrace >0:
 								print '* ',type,refid
-								print keyword, parameter
-								if parsed_notation.has_key('arg_count'):
-									print parsed_notation['arg_count']
-									print ''
+								print keyword, parameter,stack_count
+							if stack_count>max_stack_count:
+								max_stack_count=stack_count
 
-								if stack_count>max_stack_count:
-									max_stack_count=stack_count
+					orig_localcount=0
+					if max_stack_count>0:
+						orig_localcount=int(body_parameters['localcount'])
+						new_localcount=str(orig_localcount+max_stack_count+1)
+						print 'Increasing localcount %s -> %s' % (body_parameters['localcount'], new_localcount)
+						body_parameters['localcount']=new_localcount
+						if self.DebugAddAPITrace >0:
+							print "Max stack count:", type, refid, max_stack_count
 
-					if self.DebugAddAPITrace >0:
-						print "Max stack count:", type, refid, max_stack_count
+						body_parameters['maxstack']=str(int(body_parameters['maxstack'])+5)
 
 					new_blocks=[]
 					for (keyword,parameter) in blocks[block_id]:
 						if keyword[0:4]=='call':
-							new_blocks.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
 							escaped_parameter=parameter.replace('"','\\"')
+
+							stack_count=self.GetCallStackCount(keyword,parameter)
+							
+							if stack_count>0:
+								current_local_count=orig_localcount
+
+								array_ns='QName(PackageNamespace(""), "Array")'
+								new_blocks.append(['findpropstrict',array_ns])
+								new_blocks.append(['constructprop',array_ns +', 0'])
+								new_blocks.append(['coerce',array_ns])
+								array_reg=current_local_count
+								new_blocks.append(['setlocal','%d' % array_reg])
+								current_local_count+=1
+
+								for i in range(0,stack_count,1):
+									new_blocks.append(['setlocal','%d' % current_local_count])
+									current_local_count+=1
+
+								for i in range(0,stack_count,1):
+									new_blocks.append(['getlocal','%d' % array_reg])
+									new_blocks.append(['getlocal','%d' % (current_local_count-1-i)])
+									new_blocks.append(['callpropvoid','QName(Namespace("http://adobe.com/AS3/2006/builtin"), "push"), 1'])
+								         
+								new_blocks.append(['getlex','QName(PackageNamespace(""), "Util")'])
+								new_blocks.append(['pushstring','"%s"' % filename])
+								new_blocks.append(['pushstring','"%s"' % refid])
+								new_blocks.append(['pushstring','"%s %s"' % (keyword,escaped_parameter)])
+								new_blocks.append(['getlocal','%d' % array_reg])
+								new_blocks.append(['callpropvoid','QName(PackageNamespace(""), "DumpArray"), 4'])
+
+								for i in range(0,stack_count,1):
+									new_blocks.append(['getlocal','%d' % (current_local_count-1-i) ])
+
+							"""
+							new_blocks.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
 							new_blocks.append(['pushstring','"%s\t%s -> %s %s"' % (filename,refid,keyword,escaped_parameter)])
-							new_blocks.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])			
+							new_blocks.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])	
+							"""
+									
 						new_blocks.append([keyword,parameter])	
 
 					blocks[block_id]=new_blocks
 
-			methods[refid]=(blocks,maps,labels,type)
+			methods[refid]=(blocks,maps,labels,parents,body_parameters)
 		return methods
 
-	def Instrument(self,dir,target_dir,operations=[],replace_patterns=[]):
+	def Instrument(self,dir,target_dir,operations=[]):
 		assemblies=asasm.RetrieveAssembly(dir)
 		for file in assemblies.keys():
-			if "AddBasicBlockTraces" in operations:
-				assemblies[file][1]=self.AddBasicBlockTrace(assemblies[file][1],filename=file)
-				assemblies=self.UpdateParsedLines(assemblies)
+			for (operation,options) in operations:
+				if operation=="AddBasicBlockTraces":
+					assemblies[file][1]=self.AddBasicBlockTrace(assemblies[file][1],filename=file)
+					assemblies=self.UpdateParsedLines(assemblies)
 
-			if "AddAPITraces" in operations:
-				assemblies[file][1]=self.AddAPITrace(assemblies[file][1],filename=file)
-				assemblies=self.UpdateParsedLines(assemblies)
+				if operation=="AddAPITraces":
+					assemblies[file][1]=self.AddAPITrace(assemblies[file][1],filename=file)
+					assemblies=self.UpdateParsedLines(assemblies)
 
-			if "Replace" in operations:
-				for [orig,replace] in replace_patterns:
-					parsed_lines=self.ReplaceSymbol(parsed_lines,orig,replace)
-					"""
-					if not filename_replaced and basename.find(orig)>=0:
-						new_filename=os.path.join(new_folder,basename.replace(orig,replace))
-						filename_replaced=True
-					"""
+				if operation=="Replace":
+					for [orig,replace] in options:
+						parsed_lines=self.ReplaceSymbol(parsed_lines,orig,replace)
+						"""
+						if not filename_replaced and basename.find(orig)>=0:
+							new_filename=os.path.join(new_folder,basename.replace(orig,replace))
+							filename_replaced=True
+						"""
 
-			if "AddMethodTraces" in operations:
-				assemblies[file][0]=self.AddMethodTrace(assemblies[file][0])
+				if operation=="AddMethodTraces":
+					assemblies[file][0]=self.AddMethodTrace(assemblies[file][0])
 
-				if self.DebugMethodTrace>0:
-					print '='*80
-					pprint.pprint(assemblies[file][0])
-					print ''
+					if self.DebugMethodTrace>0:
+						print '='*80
+						pprint.pprint(assemblies[file][0])
+						print ''
+
+				if operation=="Include":
+					if file[-1*len('.main.asasm'):]=='.main.asasm':
+						print file
+						[process_lines,methods]=assemblies[file]
+						for index in range(0,len(process_lines),1):
+							(prefix,keyword,parameter,comment)=process_lines[index]
+							if keyword=='end':
+								print 'Inserting', options
+								include_lines=[]
+								for include_file in options:
+									include_lines.append([' ',"#include",'"%s"' % include_file,''])
+								process_lines[index:index]=include_lines
+								break
+						pprint.pprint(process_lines)
+						assemblies[file][0]=process_lines
 
 		asasm.WriteToFiles(assemblies,target_dir)
 
@@ -660,6 +751,7 @@ if __name__=='__main__':
 	parser.add_option("-m","--method",dest="method",action="store_true",default=False)
 	parser.add_option("-b","--basic_blocks",dest="basic_blocks",action="store_true",default=False)
 	parser.add_option("-a","--api",dest="api",action="store_true",default=False)
+	parser.add_option("-i","--include",dest="include",action="store_true",default=False)
 	(options,args)=parser.parse_args()
 
 	dir=''
@@ -711,12 +803,17 @@ if __name__=='__main__':
 
 	elif options.method:
 		asasm=ASASM()
-		asasm.Instrument(dir,target_dir,["AddMethodTraces"])
+		asasm.Instrument(dir,target_dir,[["AddMethodTraces",'']])
 
 	elif options.basic_blocks:
 		asasm=ASASM()
-		asasm.Instrument(dir,target_dir,["AddBasicBlockTraces"])
+		asasm.Instrument(dir,target_dir,[["AddBasicBlockTraces",'']])
 
 	elif options.api:
 		asasm=ASASM()
-		asasm.Instrument(dir,target_dir,["AddAPITraces"])
+		print 'APITrace'
+		asasm.Instrument(dir,target_dir,[["AddAPITraces",''], ["Include",["Util.script.asasm"]]])
+
+	elif options.include:
+		asasm=ASASM()
+		asasm.Instrument(dir,target_dir,["Include"],["../Util-0/Util.script.asasm"])
