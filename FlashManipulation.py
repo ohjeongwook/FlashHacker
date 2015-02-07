@@ -310,7 +310,7 @@ class ASASM:
 		label={}
 		for id in ids:
 			for (keyword,parameter) in blocks[id]:
-				if keyword[0:2]=='if' or keyword=='jump':
+				if keyword[0:2]=='if' or keyword=='jump' or keyword=='lookupswitch':
 					label[int(parameter[1:])]=1
 
 		for id in ids:
@@ -479,28 +479,42 @@ class ASASM:
 
 					instructions.append([keyword,parameter])
 					instruction_count+=1
-					if keyword[0:2]=='if' or keyword=='jump':
+					if keyword[0:2]=='if' or keyword=='jump' or keyword=='lookupswitch':
 						if self.DebugMethods>0:
 							print '* New block %s (end of a block)' % block_name
 
 						if len(instructions)>0:
-							blocks[block_name]=instructions
-							jump_location=int(parameter[1:])
-							if not maps.has_key(block_name):
-								maps[block_name]=[jump_location]
-							else:
-								if not jump_location in maps[block_name]:
-									maps[block_name].append(jump_location)						
+							jmp_labels=[]
+							if keyword=='lookupswitch':
+								for label in parameter.split(','):
+									label=label.strip()
+									if label[0]=='[':
+										label=label[1:]
+									if label[-1]==']':
+										label=label[0:-1]
 
-							if self.DebugMethods>0:
-								print '%s -> %s (if/jmp)' % (block_name,jump_location)
-								print ''
+									jmp_labels.append(int(label[1:]))
+							else:
+								jmp_labels.append(int(parameter[1:]))
+								
+							blocks[block_name]=instructions
+
+							for label in jmp_labels:
+								if not maps.has_key(block_name):
+									maps[block_name]=[label]
+								else:
+									if not label in maps[block_name]:
+										maps[block_name].append(label)						
+
+								if self.DebugMethods>0:
+									print '%s -> %s (if/jmp)' % (block_name,label)
+									print ''
 
 						last_block_name=block_name
 						block_name=instruction_count
 						instructions=[]
 
-					if keyword=='jump':
+					if keyword=='jump' or keyword=='lookupswitch':
 						is_last_instruction_jmp=True
 					else:
 						is_last_instruction_jmp=False
