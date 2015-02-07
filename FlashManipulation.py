@@ -1035,7 +1035,7 @@ class ASASM:
 
 		local_namespaces={}
 		refids={}
-		for [file,[parsed_lines,methods]] in self.Assemblies.items():
+		for [class_name,[parsed_lines,methods]] in self.Assemblies.items():
 			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
 				refids[refid]=1
 
@@ -1057,7 +1057,7 @@ class ASASM:
 
 		local_names={}
 		api_names={}
-		for [file,[parsed_lines,methods]] in self.Assemblies.items():
+		for [class_name,[parsed_lines,methods]] in self.Assemblies.items():
 			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
 				for [block_id,block] in blocks.items():
 					block_line_no=0
@@ -1091,14 +1091,14 @@ class ASASM:
 
 										if not local_names.has_key(qname):
 											local_names[qname]=[]
-										local_names[qname].append([op, refid, block_id, block_line_no])
+										local_names[qname].append([op, class_name, refid, block_id, block_line_no])
 								else:
 									if self.DebugNames>0:
 										print 'API Name:', qname, op, refid, block_id, block_line_no
 									
 									if not api_names.has_key(qname):
 											api_names[qname]=[]
-									api_names[qname].append([op, refid, block_id, block_line_no])
+									api_names[qname].append([op, class_name, refid, block_id, block_line_no])
 
 							ret=self.ParseQName(qname)
 							if len(ret[1])>0:

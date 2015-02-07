@@ -41,10 +41,10 @@ class TreeItem(object):
 		return 0
 
 class TreeModel(QAbstractItemModel):
-	def __init__(self,parent=None):
+	def __init__(self,root_item,parent=None):
 		super(TreeModel, self).__init__(parent)
 		self.DirItems={}
-		self.rootItem=TreeItem(("Name",))
+		self.rootItem=TreeItem(root_item)
 		self.setupModelData()
 
 	def addDir(self,dir):
@@ -57,7 +57,7 @@ class TreeModel(QAbstractItemModel):
 			item=TreeItem((relative_file,),dir_item)
 			dir_item.appendChild(item)
 
-	def showAsasms(self,assemblies):
+	def showClasses(self,assemblies):
 		class_names=assemblies.keys()
 		class_names.sort()
 
@@ -70,7 +70,15 @@ class TreeModel(QAbstractItemModel):
 				item=TreeItem((refid,),dir_item,(class_name, refid))
 				dir_item.appendChild(item)
 
-			#for [prefix,keyword,parameter,comment] in parsed_lines:
+	def showAPIs(self,api_names):
+		api_names_list=api_names.keys()
+		api_names_list.sort()
+		for api_name in api_names_list:
+			dir_item=TreeItem((api_name,"API"))
+			self.rootItem.appendChild(dir_item)
+			for [op,class_name,refid,block_id,block_line_no] in api_names[api_name]:
+				item=TreeItem((refid,op,),dir_item,(op,class_name,refid,block_id,block_line_no))
+				dir_item.appendChild(item)
 
 	def setupModelData(self):
 		pass
@@ -159,9 +167,14 @@ class MainWindow(QMainWindow):
 		super(MainWindow,self).__init__()
 		self.setWindowTitle("Flash Hacker")
 		vertical_splitter=QSplitter()
+		
+		tab_widget=QTabWidget()
+		self.classTreeView=QTreeView()
+		tab_widget.addTab(self.classTreeView,"Classes")
+		self.apiTreeView=QTreeView()
+		tab_widget.addTab(self.apiTreeView,"API")
 
-		self.treeView=QTreeView()
-		vertical_splitter.addWidget(self.treeView)
+		vertical_splitter.addWidget(tab_widget)
 
 		self.graph=MyGraphicsView()
 		self.graph.setRenderHints(QPainter.Antialiasing)
@@ -185,7 +198,6 @@ class MainWindow(QMainWindow):
 		dialog.setOption(QFileDialog.ShowDirsOnly)
 		directory=dialog.getExistingDirectory(self,"Choose Directory",os.getcwd())
 
-		print 'directory',directory
 		if directory:
 			self.showDir(directory)
 
@@ -199,32 +211,47 @@ class MainWindow(QMainWindow):
 		self.fileMenu=self.menuBar().addMenu("&File")
 		self.fileMenu.addAction(self.openAct)
 
-		self.treeViewMenu=self.menuBar().addMenu("&View")
+		self.classTreeViewMenu=self.menuBar().addMenu("&View")
 
 	def showDir(self,dir):
-		asasm=ASASM()	
-		self.Assembly=asasm.RetrieveAssembly(dir)
+		self.asasm=ASASM()	
+		self.Assembly=self.asasm.RetrieveAssembly(dir)
 
-		self.treeModel=TreeModel()
-		self.treeModel.showAsasms(self.Assembly)
-		self.treeView.setModel(self.treeModel)
-		self.treeView.connect(self.treeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.treeSelected)
-		self.treeView.expandAll()
-		#self.treeView.setSelectionMode(QAbstractItemView.MultiSelection)
+		self.treeModel=TreeModel(("Name",))
+		self.treeModel.showClasses(self.Assembly)
+		self.classTreeView.setModel(self.treeModel)
+		self.classTreeView.connect(self.classTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.classTreeSelected)
+		self.classTreeView.expandAll()
+		#self.classTreeView.setSelectionMode(QAbstractItemView.MultiSelection)
 
-	def treeSelected(self, newSelection, oldSelection):
+		[local_names,api_names]=self.asasm.GetNames()
+		self.apiTreeModel=TreeModel(("Name",""))
+		self.apiTreeModel.showAPIs(api_names)
+		self.apiTreeView.setModel(self.apiTreeModel)
+		self.apiTreeView.connect(self.apiTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.apiTreeSelected)
+		self.apiTreeView.expandAll()
+
+	def classTreeSelected(self, newSelection, oldSelection):
 		for index in newSelection.indexes():
 			item_data=self.treeModel.getAssocData(index)
 			if item_data!=None:
-				(class_name,method_name)=item_data
-				print class_name,method_name
-
+				(class_name,refid)=item_data
 				[parsed_lines,methods]=self.Assembly[class_name]
-				#[blocks,maps,labels,parents,body_parameters]=methods[method_name]
+				#[blocks,maps,labels,parents,body_parameters]=methods[refid]
 
-				asasm=ASASM()
-				[disasms,links,address2name]=asasm.ConvertMapsToPrintable(methods[method_name])
+				[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
 				self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
+
+	def apiTreeSelected(self, newSelection, oldSelection):
+		for index in newSelection.indexes():
+				item_data=self.treeModel.getAssocData(index)
+				if item_data!=None:
+					(op,class_name,refid,block_id,block_line_no)=item_data
+					
+					[parsed_lines,methods]=self.Assembly[class_name]
+					[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
+					self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
+					self.graph.HilightAddress(block_id)
 
 if __name__=='__main__':
 	import sys
