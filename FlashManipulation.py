@@ -8,6 +8,9 @@ from Graphs import *
 import FlowGrapher
 
 class ASASM:
+	def __init__(self):
+		self.Assemblies={}
+
 	def ParseLine(self,line):
 		prefix=''
 		keyword=''
@@ -168,8 +171,8 @@ class ASASM:
 			fd.write(line)
 		fd.close()
 
-	def WriteToFiles(self,assemblies,target_dir):
-		for (file,(parsed_lines,methods)) in assemblies.items():
+	def WriteToFiles(self,target_dir):
+		for (file,(parsed_lines,methods)) in self.Assemblies.items():
 			new_filename=os.path.join(target_dir,file)
 
 			new_folder=os.path.dirname(new_filename)
@@ -310,7 +313,7 @@ class ASASM:
 		label={}
 		for id in ids:
 			for (keyword,parameter) in blocks[id]:
-				if keyword[0:2]=='if' or keyword=='jump' or keyword=='lookupswitch':
+				if keyword[0:2]=='if' or keyword=='jump': #TODO: support lookupswitch
 					label[int(parameter[1:])]=1
 
 		for id in ids:
@@ -324,9 +327,9 @@ class ASASM:
 
 		return parsed_lines
 
-	def UpdateParsedLines(self,assemblies,update_code=True):
-		for file in assemblies.keys():
-			(parsed_lines,methods)=assemblies[file]
+	def UpdateParsedLines(self,update_code=True):
+		for file in self.Assemblies.keys():
+			(parsed_lines,methods)=self.Assemblies[file]
 			for (refid,(blocks,maps,labels,parents,body_parameters)) in methods.items():
 				
 				body_parameter_lines=[]
@@ -347,8 +350,7 @@ class ASASM:
 
 				parsed_lines=self.ReplaceParsedLines(parsed_lines,refid,body_parameter_lines,'body')
 
-			assemblies[file][0]=parsed_lines
-		return assemblies
+			self.Assemblies[file][0]=parsed_lines
 
 	DebugMethods=0
 	def ParseMethod(self,parsed_lines,target_method=''):
@@ -359,6 +361,18 @@ class ASASM:
 		new_parsed_lines=[]
 		in_code=False
 		methods={}
+		refid=''
+
+		body_parameters={}
+		instructions=[]
+		last_block_name=''
+		is_last_instruction_jmp=False
+		maps={}
+		block_name=''
+		instruction_count=0
+		blocks={}
+		lables={}
+		labels={}
 
 		for [prefix,keyword,parameter,comment] in parsed_lines:
 			if keyword in self.BlockKeywords:
@@ -527,7 +541,6 @@ class ASASM:
 		return [parsed_lines,methods]
 
 	def RetrieveAssembly(self,folder,target_file='',target_method=''):
-		assemblies={}
 		for relative_file in self.EnumDir(folder):
 			if target_file=='' or target_file==relative_file:
 				file=os.path.join(folder, relative_file)
@@ -535,9 +548,15 @@ class ASASM:
 				[parsed_lines,methods]=self.RetrieveFile(file,target_method)
 				if self.DebugMethods>0:
 					pprint.pprint(methods)
-				assemblies[relative_file]=[parsed_lines,methods]
+				self.Assemblies[relative_file]=[parsed_lines,methods]
 
-		return assemblies
+		return self.Assemblies
+
+	def RetrieveAssemblies(self,dirs):
+		self.Assemblies={}
+		for dir in dirs:
+			self.RetrieveAssembly(dir)
+		return self.Assemblies
 
 	def EnumDir(self,root_dir,dir='.'):
 		files=dircache.listdir(os.path.join(root_dir,dir))
@@ -743,22 +762,22 @@ class ASASM:
 
 	DebugInstrument=0
 	def Instrument(self,dir,target_dir,operations=[]):
-		assemblies=self.RetrieveAssembly(dir)
+		self.RetrieveAssembly(dir)
 
-		[local_names,api_names]=asasm.GetNames([dir])
+		[local_names,api_names]=self.GetNames()
 
-		for file in assemblies.keys():
+		for file in self.Assemblies.keys():
 			for (operation,options) in operations:
 				if self.DebugInstrument >0:
 					print '* Instrumenting', file, operation,options
 
 				if operation=="AddBasicBlockTrace":
-					assemblies[file][1]=self.AddBasicBlockTrace(assemblies[file][1],filename=file)
-					assemblies=self.UpdateParsedLines(assemblies)
+					self.Assemblies[file][1]=self.AddBasicBlockTrace(self.Assemblies[file][1],filename=file)
+					self.UpdateParsedLines()
 
 				if operation=="AddAPITrace":
-					assemblies[file][1]=self.AddAPITrace(assemblies[file][1],filename=file,api_names=api_names)
-					assemblies=self.UpdateParsedLines(assemblies)
+					self.Assemblies[file][1]=self.AddAPITrace(self.Assemblies[file][1],filename=file,api_names=api_names)
+					self.UpdateParsedLines()
 
 				if operation=="Replace":
 					for [orig,replace] in options:
@@ -770,20 +789,20 @@ class ASASM:
 						"""
 
 				if operation=="AddMethodTrace":
-					assemblies[file][0]=self.AddMethodTrace(assemblies[file][0])
-					for refid in assemblies[file][1].keys():
-						assemblies[file][1][refid][4]=self.AdjustParameter(assemblies[file][1][refid][4],'maxstack',5)
+					self.Assemblies[file][0]=self.AddMethodTrace(self.Assemblies[file][0])
+					for refid in self.Assemblies[file][1].keys():
+						self.Assemblies[file][1][refid][4]=self.AdjustParameter(self.Assemblies[file][1][refid][4],'maxstack',5)
 
-					assemblies=self.UpdateParsedLines(assemblies,update_code=False)
+					self.UpdateParsedLines(update_code=False)
 					if self.DebugMethodTrace>0:
 						print '='*80
-						pprint.pprint(assemblies[file][0])
+						pprint.pprint(self.Assemblies[file][0])
 						print ''
 
 				if operation=="Include":
 					if file[-1*len('.main.asasm'):]=='.main.asasm':
 						print file
-						[process_lines,methods]=assemblies[file]
+						[process_lines,methods]=self.Assemblies[file]
 						for index in range(0,len(process_lines),1):
 							(prefix,keyword,parameter,comment)=process_lines[index]
 							if keyword=='end':
@@ -794,9 +813,9 @@ class ASASM:
 								process_lines[index:index]=include_lines
 								break
 						pprint.pprint(process_lines)
-						assemblies[file][0]=process_lines
+						self.Assemblies[file][0]=process_lines
 
-		self.WriteToFiles(assemblies,target_dir)
+		self.WriteToFiles(target_dir)
 
 	DebugParse=0
 	def ParseTraitLine(self,line):
@@ -954,16 +973,16 @@ class ASASM:
 			print ''
 			print '* ParseQName:', qname
 
-		[name_type,body]=asasm.ParseNameBody(qname)
-		body_elements=asasm.ParseArray(body)
+		[name_type,body]=self.ParseNameBody(qname)
+		body_elements=self.ParseArray(body)
 
 		if self.DebugParse>0:
 			print 'Name:',name_type
 			print 'Body:',body
 			print 'Body elements:',body_elements
 
-		[first_arg_name, first_arg_param]=asasm.ParseNameBody(body_elements[0])
-		first_arg_elements=asasm.ParseArray(first_arg_param)
+		[first_arg_name, first_arg_param]=self.ParseNameBody(body_elements[0])
+		first_arg_elements=self.ParseArray(first_arg_param)
 		body_elements[0]=[first_arg_name,first_arg_elements]
 
 		if self.DebugParse>0:
@@ -984,7 +1003,7 @@ class ASASM:
 		return '%s(%s)' % (name_type,body)
 
 	def ParseMultiname(self,multiname):
-		[name_type,body]=asasm.ParseNameBody(multiname)
+		[name_type,body]=self.ParseNameBody(multiname)
 
 		if self.DebugParse>0:
 			print name_type
@@ -993,11 +1012,11 @@ class ASASM:
 			print ''
 
 		elements=[]
-		for element in asasm.ParseArray(body[1:-1]):
+		for element in self.ParseArray(body[1:-1]):
 			if self.DebugParse>0:
 				print '* Parsing:', element
-			[name,param]=asasm.ParseNameBody(element)
-			param_elements=asasm.ParseArray(param)
+			[name,param]=self.ParseNameBody(element)
+			param_elements=self.ParseArray(param)
 
 			if self.DebugParse>0:
 				print 'Name:', name
@@ -1012,15 +1031,11 @@ class ASASM:
 		return [name_type,elements]
 
 	DebugNames=0
-	def GetNames(self,dirs):
-		assemblies={}
-		for dir in dirs:
-			for [file,file_data] in self.RetrieveAssembly(dir).items():
-				assemblies[file]=file_data
+	def GetNames(self):
 
 		local_namespaces={}
 		refids={}
-		for [file,[parsed_lines,methods]] in assemblies.items():
+		for [file,[parsed_lines,methods]] in self.Assemblies.items():
 			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
 				refids[refid]=1
 
@@ -1029,7 +1044,7 @@ class ASASM:
 					local_namespaces[parameter]=1
 
 				elif keyword=='trait':
-					trait_elements=asasm.ParseTraitLine(parameter)
+					trait_elements=self.ParseTraitLine(parameter)
 					if len(trait_elements)>1:
 						local_namespaces[trait_elements[1]]=1
 					else:
@@ -1042,40 +1057,48 @@ class ASASM:
 
 		local_names={}
 		api_names={}
-		for [file,[parsed_lines,methods]] in assemblies.items():
+		for [file,[parsed_lines,methods]] in self.Assemblies.items():
 			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
 				for [block_id,block] in blocks.items():
+					block_line_no=0
 					for [op,operand] in block:
 						if not operand:
+							block_line_no+=1
 							continue
+
 						if operand.startswith('"'):
 							pass
 						elif operand.startswith('QName('):
 							if self.DebugNames>0:
 								print '*', operand
-
 							
 							qnames=self.ParseArray(operand)
 							qname=qnames[0]
 
 							if local_namespaces.has_key(qname):
 								if self.DebugNames>0:
-									print 'Local Name:', qname
+									print 'Local Name:', qname, op, refid, block_id, block_line_no
 
-								local_names[qname]=1
+								if not local_names.has_key(qname):
+									local_names[qname]=[]
+								local_names[qname].append([op, refid, block_id, block_line_no])
 							else:
-								qname_parts=asasm.ParseQName(qname)
-								qname=asasm.AsmQName(qname_parts,remove_ns_arg=True)
+								qname_parts=self.ParseQName(qname)
+								qname=self.AsmQName(qname_parts,remove_ns_arg=True)
 								if local_namespaces.has_key(qname):
 									if self.DebugNames>0:
-										print 'Local Name:', qname
+										print 'Local Name:', qname, op, refid, block_id, block_line_no
 
-										local_names[qname]=1
+										if not local_names.has_key(qname):
+											local_names[qname]=[]
+										local_names[qname].append([op, refid, block_id, block_line_no])
 								else:
 									if self.DebugNames>0:
-										print 'API Name:', qname
-
-									api_names[qname]=1
+										print 'API Name:', qname, op, refid, block_id, block_line_no
+									
+									if not api_names.has_key(qname):
+											api_names[qname]=[]
+									api_names[qname].append([op, refid, block_id, block_line_no])
 
 							ret=self.ParseQName(qname)
 							if len(ret[1])>0:
@@ -1112,6 +1135,8 @@ class ASASM:
 							pass
 						else:
 							print operand
+
+						block_line_no+=1
 
 		if self.DebugNames>0:
 			pprint.pprint(local_names)
@@ -1207,8 +1232,8 @@ if __name__=='__main__':
 		asasm=ASASM()
 		asasm.DebugMethods=0
 		
-		assemblies=asasm.RetrieveAssembly(dir)
-		asasm.WriteToFiles(assemblies,target_dir)
+		asasm.RetrieveAssembly(dir)
+		asasm.WriteToFiles(target_dir)
 
 	elif options.method:
 		asasm=ASASM()
@@ -1225,11 +1250,12 @@ if __name__=='__main__':
 
 	elif options.include:
 		asasm=ASASM()
-		asasm.Instrument(dir,target_dir,["Include"],["../Util-0/Util.script.asasm"])
+		asasm.Instrument(dir,target_dir,[["Include",["../Util-0/Util.script.asasm"]]])
 
 	elif options.names:
 		asasm=ASASM()
-		[local_names,api_names]=asasm.GetNames(args)
+		asasm.RetrieveAssemblies(args)
+		[local_names,api_names]=asasm.GetNames()
 		pprint.pprint(local_names)
 		pprint.pprint(api_names)
 
