@@ -646,7 +646,7 @@ class ASASM:
 		body_parameters[key]=str(int(body_parameters[key])+value)
 		return body_parameters
 
-	def AddAPITrace(self,methods,filename=''):
+	def AddAPITrace(self,methods,filename='',api_names={}):
 		for refid in methods.keys():
 			(blocks,maps,labels,parents,body_parameters)=methods[refid]
 			for block_id in blocks.keys():
@@ -664,7 +664,7 @@ class ASASM:
 					max_stack_count=0
 
 					for (keyword,parameter) in blocks[block_id]:
-						if keyword[0:4]=='call':
+						if keyword[0:4]=='call' and api_names.has_key(self.ParseArray(parameter)[0]):
 							stack_count=self.GetCallStackCount(keyword,parameter)
 							if self.DebugAddAPITrace >0:
 								print '* ',type,refid
@@ -685,7 +685,7 @@ class ASASM:
 
 					new_blocks=[]
 					for (keyword,parameter) in blocks[block_id]:
-						if keyword[0:4]=='call':
+						if keyword[0:4]=='call' and api_names.has_key(self.ParseArray(parameter)[0]):
 							escaped_parameter=parameter.replace('"','\\"')
 
 							stack_count=self.GetCallStackCount(keyword,parameter)
@@ -730,6 +730,9 @@ class ASASM:
 	DebugInstrument=0
 	def Instrument(self,dir,target_dir,operations=[]):
 		assemblies=self.RetrieveAssembly(dir)
+
+		[local_names,api_names]=asasm.GetNames([dir])
+
 		for file in assemblies.keys():
 			for (operation,options) in operations:
 				if self.DebugInstrument >0:
@@ -740,7 +743,7 @@ class ASASM:
 					assemblies=self.UpdateParsedLines(assemblies)
 
 				if operation=="AddAPITrace":
-					assemblies[file][1]=self.AddAPITrace(assemblies[file][1],filename=file)
+					assemblies[file][1]=self.AddAPITrace(assemblies[file][1],filename=file,api_names=api_names)
 					assemblies=self.UpdateParsedLines(assemblies)
 
 				if operation=="Replace":
@@ -785,11 +788,11 @@ class ASASM:
 	def ParseTraitLine(self,line):
 		if self.DebugParse>0:
 			print line
-		name=''
+		element=''
 		body=''
 		inside_body=False
 		parents=[]
-		names=[]
+		elements=[]
 		last_ch=''
 		for ch in line:
 			if len(parents)>0:
@@ -812,40 +815,40 @@ class ASASM:
 						del parents[-1]
 						if self.DebugParse>0:
 							print '\n\t-',parents
-				name+=ch
+				element+=ch
 			else:
 				if self.DebugParse>0:
 					print ch,
 
-				if name:
+				if element:
 					if ch=='(':
 						parents.append(ch)
 						if self.DebugParse>0:
 							print '\n+',parents
 						inside_string=False
-						name+=ch
+						element+=ch
 					elif ch==' ':
-						names.append(name)
+						elements.append(element)
 						if self.DebugParse>0:
-							print '\nFound:',name
+							print '\nFound:',element
 							print ''
-						name=''
+						element=''
 					else:
-						name+=ch
+						element+=ch
 				else:
-					name+=ch
+					element+=ch
 
 			last_ch=ch
 
-		if name:
-			names.append(name)
+		if element:
+			elements.append(element)
 			if self.DebugParse>0:
-				print '\nFound:',name
+				print '\nFound:',element
 				print ''
 
 		if self.DebugParse>0:
-			print names
-		return names
+			print elements
+		return elements
 
 	def ParseNameBody(self,line):
 		name=''
@@ -995,7 +998,7 @@ class ASASM:
 		return [name_type,elements]
 
 	DebugNames=0
-	def ShowNames(self,dirs):
+	def GetNames(self,dirs):
 		assemblies={}
 		for dir in dirs:
 			for [file,file_data] in self.RetrieveAssembly(dir).items():
@@ -1016,7 +1019,8 @@ class ASASM:
 					if len(trait_elements)>1:
 						local_namespaces[trait_elements[1]]=1
 					else:
-						print parameter
+						if self.DebugNames>0:
+							print parameter
 
 		if self.DebugNames>0:
 			print refids.keys()
@@ -1095,8 +1099,11 @@ class ASASM:
 						else:
 							print operand
 
-		pprint.pprint(local_names)
-		pprint.pprint(api_names)
+		if self.DebugNames>0:
+			pprint.pprint(local_names)
+			pprint.pprint(api_names)
+
+		return [local_names,api_names]
 
 if __name__=='__main__':
 	from optparse import OptionParser
@@ -1205,9 +1212,12 @@ if __name__=='__main__':
 	elif options.include:
 		asasm=ASASM()
 		asasm.Instrument(dir,target_dir,["Include"],["../Util-0/Util.script.asasm"])
+
 	elif options.names:
 		asasm=ASASM()
-		asasm.ShowNames(args)
+		[local_names,api_names]=asasm.GetNames(args)
+		pprint.pprint(local_names)
+		pprint.pprint(api_names)
 
 	if options.test=='Name':
 		asasm=ASASM()
