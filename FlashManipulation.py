@@ -781,6 +781,323 @@ class ASASM:
 
 		self.WriteToFiles(assemblies,target_dir)
 
+	DebugParse=0
+	def ParseTraitLine(self,line):
+		if self.DebugParse>0:
+			print line
+		name=''
+		body=''
+		inside_body=False
+		parents=[]
+		names=[]
+		last_ch=''
+		for ch in line:
+			if len(parents)>0:
+				if self.DebugParse>0:
+					print ch,
+				if inside_string:
+					if ch=='"' and last_ch!='\\':
+						inside_string=False
+				else:
+					if ch=='"':
+						inside_string=True
+
+				if not inside_string:
+					if ch=='(':
+						parents.append(ch)
+						if self.DebugParse>0:
+							print '\n\t+',parents
+
+					elif ch==')':
+						del parents[-1]
+						if self.DebugParse>0:
+							print '\n\t-',parents
+				name+=ch
+			else:
+				if self.DebugParse>0:
+					print ch,
+
+				if name:
+					if ch=='(':
+						parents.append(ch)
+						if self.DebugParse>0:
+							print '\n+',parents
+						inside_string=False
+						name+=ch
+					elif ch==' ':
+						names.append(name)
+						if self.DebugParse>0:
+							print '\nFound:',name
+							print ''
+						name=''
+					else:
+						name+=ch
+				else:
+					name+=ch
+
+			last_ch=ch
+
+		if name:
+			names.append(name)
+			if self.DebugParse>0:
+				print '\nFound:',name
+				print ''
+
+		if self.DebugParse>0:
+			print names
+		return names
+
+	def ParseNameBody(self,line):
+		name=''
+		body=''
+		inside_body=False
+		parents=[]
+		last_ch=''
+		for ch in line:
+			if len(parents)>0:
+				if self.DebugParse>0:
+					print '*', ch
+				if inside_string:
+					if ch=='"' and last_ch!='\\':
+						inside_string=False
+				else:
+					if ch=='"':
+						inside_string=True
+				if not inside_string:
+					if ch in ('[','('):
+						parents.append(ch)
+						if self.DebugParse>0:
+							print parents
+					elif ch in (']',')'):
+						del parents[-1]
+						if self.DebugParse>0:
+							print parents
+						if len(parents)==0:
+							break
+				body+=ch
+			else:
+				if name and ch=='(':
+					parents.append(ch)
+					inside_string=False
+				else:
+					name+=ch
+			last_ch=ch
+		return [name,body]
+
+	def ParseArray(self,line):
+		parents=[]
+		last_ch=''
+		inside_string=False
+		current_element=''
+		array=[]
+		for ch in line:
+			if self.DebugParse>0:
+				print ch,
+
+			if inside_string:
+				if ch=='"' and last_ch!='\\':
+					inside_string=False
+			else:
+				if ch=='"':
+					inside_string=True
+
+			if not inside_string:
+				if ch in ('[','('):
+					parents.append(ch)
+					if self.DebugParse>0:
+						print '\n* opening:',parents
+						print ''
+				elif ch in (']',')'):
+					del parents[-1]
+					if self.DebugParse>0:
+						print '\n* closing:',parents
+						print ''
+				if len(parents)==0 and ch==',':
+					if self.DebugParse>0:
+						print '\n* current_element:',current_element
+						print ''
+					array.append(current_element)
+					current_element=''
+				else:
+					if not current_element and (ch==' ' or ch=='\t'):
+						pass
+					else:
+						current_element+=ch
+			else:
+				current_element+=ch
+
+			last_ch=ch
+
+		if current_element:
+			array.append(current_element)
+		return array
+
+	def ParseQName(self,qname):
+		if self.DebugParse>0:
+			print ''
+			print '* ParseQName:', qname
+
+		[name_type,body]=asasm.ParseNameBody(qname)
+		body_elements=asasm.ParseArray(body)
+
+		if self.DebugParse>0:
+			print 'Name:',name_type
+			print 'Body:',body
+			print 'Body elements:',body_elements
+
+		[first_arg_name, first_arg_param]=asasm.ParseNameBody(body_elements[0])
+		first_arg_elements=asasm.ParseArray(first_arg_param)
+		body_elements[0]=[first_arg_name,first_arg_elements]
+
+		if self.DebugParse>0:
+			print '1st Arg Name:', first_arg_name
+			print '1st Arg Element:', first_arg_elements
+			print 'Body elements:',body_elements
+
+		return [name_type, body_elements]
+
+	def AsmQName(self,(name_type, body_elements),remove_ns_arg=False):
+		[first_arg_name,first_arg_elements]=body_elements[0]
+
+		if remove_ns_arg and len(first_arg_elements)>1:
+			del first_arg_elements[1]
+		new_body_elements=deepcopy(body_elements)
+		new_body_elements[0]='%s(%s)' % (first_arg_name,', '.join(first_arg_elements))
+		body=', '.join(new_body_elements)
+		return '%s(%s)' % (name_type,body)
+
+	def ParseMultiname(self,multiname):
+		[name_type,body]=asasm.ParseNameBody(multiname)
+
+		if self.DebugParse>0:
+			print name_type
+			print ''
+			print body
+			print ''
+
+		elements=[]
+		for element in asasm.ParseArray(body[1:-1]):
+			if self.DebugParse>0:
+				print '* Parsing:', element
+			[name,param]=asasm.ParseNameBody(element)
+			param_elements=asasm.ParseArray(param)
+
+			if self.DebugParse>0:
+				print 'Name:', name
+				print 'Param:', param
+				print ''
+				print param_elements
+				print ''
+				print ''
+
+			elements.append([name,param_elements])
+
+		return [name_type,elements]
+
+	DebugNames=0
+	def ShowNames(self,dirs):
+		assemblies={}
+		for dir in dirs:
+			for [file,file_data] in self.RetrieveAssembly(dir).items():
+				assemblies[file]=file_data
+
+		local_namespaces={}
+		refids={}
+		for [file,[parsed_lines,methods]] in assemblies.items():
+			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
+				refids[refid]=1
+
+			for [prefix,keyword,parameter,comment] in parsed_lines:
+				if keyword=='instance':
+					local_namespaces[parameter]=1
+
+				elif keyword=='trait':
+					trait_elements=asasm.ParseTraitLine(parameter)
+					if len(trait_elements)>1:
+						local_namespaces[trait_elements[1]]=1
+					else:
+						print parameter
+
+		if self.DebugNames>0:
+			print refids.keys()
+			print local_namespaces.keys()
+
+		local_names={}
+		api_names={}
+		for [file,[parsed_lines,methods]] in assemblies.items():
+			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
+				for [block_id,block] in blocks.items():
+					for [op,operand] in block:
+						if not operand:
+							continue
+						if operand.startswith('"'):
+							pass
+						elif operand.startswith('QName('):
+							if self.DebugNames>0:
+								print '*', operand
+
+							
+							qnames=self.ParseArray(operand)
+							qname=qnames[0]
+
+							if local_namespaces.has_key(qname):
+								if self.DebugNames>0:
+									print 'Local Name:', qname
+
+								local_names[qname]=1
+							else:
+								qname_parts=asasm.ParseQName(qname)
+								qname=asasm.AsmQName(qname_parts,remove_ns_arg=True)
+								if local_namespaces.has_key(qname):
+									if self.DebugNames>0:
+										print 'Local Name:', qname
+
+										local_names[qname]=1
+								else:
+									if self.DebugNames>0:
+										print 'API Name:', qname
+
+									api_names[qname]=1
+
+							ret=self.ParseQName(qname)
+							if len(ret[1])>0:
+								[namespace_note,arg]=ret[1]
+								[namespace,param]=namespace_note
+
+								if self.DebugNames>0:
+									print namespace
+									print param
+								arg=arg[1:-1]
+
+								if refids.has_key(arg):
+									print 'Local arg:', arg
+
+						elif operand.startswith('MultinameL'):
+							if self.DebugNames>0:
+								print '*', operand
+								pprint.pprint(self.ParseMultiname(operand))
+								print ''
+						elif operand.startswith('Multiname'):
+							if self.DebugNames>0:
+								print '*', operand
+								pprint.pprint(self.ParseMultiname(operand))
+								print ''
+						elif operand.startswith('TypeName'):
+							if self.DebugNames>0:
+								print '*', operand
+								print ''
+						elif operand=='null':
+							pass
+						elif operand[0]=='L':
+							pass
+						elif ord(operand[0])>=ord('0') and ord(operand[0])<=ord('9') or operand[0]=='-':
+							pass
+						else:
+							print operand
+
+		pprint.pprint(local_names)
+		pprint.pprint(api_names)
+
 if __name__=='__main__':
 	from optparse import OptionParser
 	import sys
@@ -821,6 +1138,8 @@ if __name__=='__main__':
 	parser.add_option("-b","--basic_blocks",dest="basic_blocks",action="store_true",default=False)
 	parser.add_option("-a","--api",dest="api",action="store_true",default=False)
 	parser.add_option("-i","--include",dest="include",action="store_true",default=False)
+	parser.add_option("-n","--names",dest="names",action="store_true",default=False)
+	parser.add_option("-t", "--test", dest="test",help="Perform basic tests", metavar="TEST")
 	(options,args)=parser.parse_args()
 
 	dir=''
@@ -886,3 +1205,48 @@ if __name__=='__main__':
 	elif options.include:
 		asasm=ASASM()
 		asasm.Instrument(dir,target_dir,["Include"],["../Util-0/Util.script.asasm"])
+	elif options.names:
+		asasm=ASASM()
+		asasm.ShowNames(args)
+
+	if options.test=='Name':
+		asasm=ASASM()
+
+		multinames=[]
+		multinames.append("""MultinameL([PrivateNamespace("*", "_a_-_---/class#0"), PackageNamespace(""), PrivateNamespace("*", "_a_-_---/class#1"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), ProtectedNamespace("_a_-_---"), StaticProtectedNs("_a_-_---"), StaticProtectedNs("flash.display:Sprite"), StaticProtectedNs("flash.display:DisplayObjectContainer"), StaticProtectedNs("flash.display:InteractiveObject"), StaticProtectedNs("flash.display:DisplayObject"), StaticProtectedNs("flash.events:EventDispatcher"), StaticProtectedNs("Object")])""")
+		multinames.append(""""Multiname("IFlexAsset", [PackageNamespace("mx.core")])""")
+		multinames.append("""Multiname("Vector", [PrivateNamespace("*", "catch for/instance#0"), PackageNamespace("flash.system"), PackageNamespace("", "#0"), Namespace("http://adobe.com/AS3/2006/builtin"), PrivateNamespace("*", "catch for/instance#1"), PackageInternalNs(""), PackageNamespace("flash.display"), PackageNamespace("flash.events"), PackageNamespace("flash.utils"), ProtectedNamespace("catch for"), StaticProtectedNs("catch for"), StaticProtectedNs("flash.display:MovieClip"), StaticProtectedNs("flash.display:Sprite"), StaticProtectedNs("flash.display:DisplayObjectContainer"), StaticProtectedNs("flash.display:InteractiveObject"), StaticProtectedNs("flash.display:DisplayObject"), StaticProtectedNs("flash.events:EventDispatcher"), PackageNamespace("__AS3__.vec")])""")
+		for multiname in multinames:
+			print '*', multiname
+			ret=asasm.ParseMultiname(multiname)
+			pprint.pprint(ret)
+			print ''
+
+		qname="""QName(PrivateNamespace("*", "catch for/instance#0"), "521423832396123423632234")"""
+		print '*',qname
+		pprint.pprint(asasm.ParseQName(qname))
+		print ''
+
+		qname='QName(Namespace("http://www.adobe.com/2006/flex/mx/internal"), "VERSION")'
+		print '*',qname
+		pprint.pprint(asasm.ParseArray(qname))
+		print ''
+
+		qname='QName(PrivateNamespace("*", "catch for/instance#0"), "52142332316123423632234"), 1'
+		print '*',qname
+		pprint.pprint(asasm.ParseArray(qname))
+		print ''
+
+		qname='QName(PackageNamespace("", "#3"), "_a_-_---")'
+		print '*',qname
+		qname_parts=asasm.ParseQName(qname)
+		pprint.pprint(qname_parts)
+		print asasm.AsmQName(qname_parts,remove_ns_arg=True)
+		print ''
+
+	elif options.test=="Trait":
+		trait="""trait method QName(PrivateNamespace("*", "_a_-_---/class#0"), "_a_--__") flag FINAL dispid 4"""
+		asasm=ASASM()
+		print asasm.ParseTraitLine(trait)
+
+	
