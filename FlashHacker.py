@@ -57,16 +57,20 @@ class TreeModel(QAbstractItemModel):
 			item=TreeItem((relative_file,),dir_item)
 			dir_item.appendChild(item)
 
-	def showDir(self,files):
-		class_names=files.keys()
+	def showAsasms(self,assemblies):
+		class_names=assemblies.keys()
 		class_names.sort()
+
 		for class_name in class_names:
-			methods=files[class_name]
 			dir_item=TreeItem((class_name,))
 			self.rootItem.appendChild(dir_item)
-			for (method,method_data) in methods.items():
-				item=TreeItem((method,),dir_item,(class_name, method))
+
+			[parsed_lines,methods]=assemblies[class_name]
+			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
+				item=TreeItem((refid,),dir_item,(class_name, refid))
 				dir_item.appendChild(item)
+
+			#for [prefix,keyword,parameter,comment] in parsed_lines:
 
 	def setupModelData(self):
 		pass
@@ -202,7 +206,7 @@ class MainWindow(QMainWindow):
 		self.Assembly=asasm.RetrieveAssembly(dir)
 
 		self.treeModel=TreeModel()
-		self.treeModel.showDir(self.Assembly)
+		self.treeModel.showAsasms(self.Assembly)
 		self.treeView.setModel(self.treeModel)
 		self.treeView.connect(self.treeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.treeSelected)
 		self.treeView.expandAll()
@@ -210,11 +214,16 @@ class MainWindow(QMainWindow):
 
 	def treeSelected(self, newSelection, oldSelection):
 		for index in newSelection.indexes():
-			ret=self.treeModel.getAssocData(index)
-			if ret!=None:
-				(class_name,method_name)=ret
+			item_data=self.treeModel.getAssocData(index)
+			if item_data!=None:
+				(class_name,method_name)=item_data
+				print class_name,method_name
+
+				[parsed_lines,methods]=self.Assembly[class_name]
+				#[blocks,maps,labels,parents,body_parameters]=methods[method_name]
+
 				asasm=ASASM()
-				[disasms,links,address2name]=asasm.ConvertMapsToPrintable(self.Assembly[class_name][method_name])
+				[disasms,links,address2name]=asasm.ConvertMapsToPrintable(methods[method_name])
 				self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
 
 if __name__=='__main__':
