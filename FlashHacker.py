@@ -4,6 +4,44 @@ from PySide.QtSql import *
 import os
 from FlashManipulation import *
 
+class ConfigurationDialog(QDialog):
+	def __init__(self,parent=None,rabcdasm='',log_level=0):
+		super(ConfigurationDialog,self).__init__(parent)
+		self.setWindowTitle("Configuration")
+		self.setWindowIcon(QIcon('DarunGrim.png'))
+
+		rabcdasm_button=QPushButton('RABCDAsm Path:',self)
+		rabcdasm_button.clicked.connect(self.getRABCDasmPath)
+		self.rabcdasm_line=QLineEdit("")
+		self.rabcdasm_line.setAlignment(Qt.AlignLeft)
+		self.rabcdasm_line.setMinimumWidth(250)
+		self.rabcdasm_line.setText(rabcdasm)
+
+		buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+		buttonBox.accepted.connect(self.accept)
+		buttonBox.rejected.connect(self.reject)
+
+		main_layout=QGridLayout()
+		main_layout.addWidget(rabcdasm_button,0,0)
+		main_layout.addWidget(self.rabcdasm_line,0,1)
+
+		main_layout.addWidget(buttonBox,6,1)
+
+		self.setLayout(main_layout)
+
+	def keyPressEvent(self,e):
+		key=e.key()
+
+		if key==Qt.Key_Return or key==Qt.Key_Enter:
+			return
+		else:
+			super(ConfigurationDialog,self).keyPressEvent(e)
+
+	def getRABCDasmPath(self):
+		dir_name=QFileDialog.getExistingDirectory(self,'FileStore Dir')
+		if dir_name:
+			self.rabcdasm_line.setText(dir_name)
+
 class TreeItem(object):
 	def __init__(self,data,parent=None,assoc_data=None):
 		self.parentItem=parent
@@ -166,6 +204,8 @@ class MainWindow(QMainWindow):
 	def __init__(self):
 		super(MainWindow,self).__init__()
 		self.setWindowTitle("Flash Hacker")
+		self.readSettings()
+
 		vertical_splitter=QSplitter()
 		
 		tab_widget=QTabWidget()
@@ -189,7 +229,8 @@ class MainWindow(QMainWindow):
 		self.setCentralWidget(main_widget)
 		
 		self.createMenus()
-		self.resize(800,600)
+
+		self.restoreUI()
 		self.show()
 
 	def open(self):
@@ -252,6 +293,79 @@ class MainWindow(QMainWindow):
 					[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
 					self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
 					self.graph.HilightAddress(block_id)
+
+	def showConfiguration(self):
+		dialog=ConfigurationDialog(rabcdasm=self.RABCDAsmPath)
+		if dialog.exec_():
+			self.RABCDAsmPath=dialog.rabcdasm_line.text()
+
+	def readSettings(self):
+		settings=QSettings("DarunGrim LLC", "FlashHacker")
+
+		self.ShowGraphs=True
+		if settings.contains("General/ShowGraphs"):
+			if settings.value("General/ShowGraphs")=='true':
+				self.ShowGraphs=True
+			else:
+				self.ShowGraphs=False
+
+		self.RABCDAsmPath=''
+		if settings.contains("General/RABCDAsmPath"):
+			self.RABCDAsmPath=settings.value("General/RABCDAsmPath")
+
+		self.FirstConfigured=False
+		if not settings.contains("General/FirstConfigured"):
+			self.showConfiguration()
+			self.FirstConfigured=True
+		else:
+			self.FirstConfigured=True
+
+	def saveSettings(self):
+		settings = QSettings("DarunGrim LLC", "FlashHacker")
+		settings.setValue("General/ShowGraphs", self.ShowGraphs)
+		settings.setValue("General/RABCDAsmPath", self.RABCDAsmPath)
+
+		if self.FirstConfigured==True:
+			settings.setValue("General/FirstConfigured", self.FirstConfigured)
+
+	def closeEvent(self, event):
+		self.saveSettings()
+		self.saveUI()
+		QMainWindow.closeEvent(self, event)
+
+	def changeEvent(self,event):
+		if event.type()==QEvent.WindowStateChange:
+			if (self.windowState()&Qt.WindowMinimized)==0 and \
+				 (self.windowState()&Qt.WindowMaximized)==0 and \
+				 (self.windowState()&Qt.WindowFullScreen)==0 and \
+				 (self.windowState()&Qt.WindowActive)==0:
+					pass
+
+	def resizeEvent(self,event):
+		if not self.isMaximized():
+			self.NonMaxGeometry=self.saveGeometry()
+
+	def restoreUI(self):
+		settings=QSettings("DarunGrim LLC", "FlashHacker")
+		
+		if settings.contains("geometry/non_max"):
+			self.NonMaxGeometry=settings.value("geometry/non_max")
+			self.restoreGeometry(self.NonMaxGeometry)
+		else:
+			self.resize(800,600)
+			self.NonMaxGeometry=self.saveGeometry()
+		
+		if settings.contains("isMaximized"):
+			if settings.value("isMaximized")=="true":
+				self.setWindowState(self.windowState()|Qt.WindowMaximized)
+		self.restoreState(settings.value("windowState"))
+
+	def saveUI(self):
+		settings=QSettings("DarunGrim LLC", "FlashHacker")
+		if self.NonMaxGeometry!=None:
+			settings.setValue("geometry/non_max", self.NonMaxGeometry)
+		settings.setValue("isMaximized", self.isMaximized())
+		settings.setValue("windowState", self.saveState())
 
 if __name__=='__main__':
 	import sys
