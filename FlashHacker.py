@@ -2,6 +2,9 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 from PySide.QtSql import *
 import os
+import subprocess
+import shutil
+
 from FlashManipulation import *
 
 class ConfigurationDialog(QDialog):
@@ -206,6 +209,9 @@ class MainWindow(QMainWindow):
 		self.setWindowTitle("Flash Hacker")
 		self.readSettings()
 
+		self.Directories=[]
+		self.SWFFilename=''
+
 		vertical_splitter=QSplitter()
 		
 		tab_widget=QTabWidget()
@@ -233,30 +239,139 @@ class MainWindow(QMainWindow):
 		self.restoreUI()
 		self.show()
 
-	def open(self):
+	def disasm(self):
+		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
+		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
+		filename = QFileDialog.getOpenFileName(self,
+			"Open SWF", "", "SWF Files (*.swf)")[0]
+
+		if filename:
+			self.SWFFilename=filename
+			print subprocess.Popen("%s %s" % (abcexport,filename), shell=True, stdout=subprocess.PIPE).stdout.read()
+
+			dir_name=os.path.dirname(filename)
+			base_filename='.'.join(os.path.basename(filename).split('.')[0:-1])
+
+			i=0
+			abc_dirnames=[]
+			while True:
+				abc_filename=os.path.join(dir_name,'%s-%d.abc' % (base_filename,i))
+				abc_filename=abc_filename.replace('/','\\')
+
+				if os.path.isfile(abc_filename):
+					print 'abc_filename:', abc_filename
+					print subprocess.Popen("%s %s" % (rabcdasm,abc_filename), shell=True, stdout=subprocess.PIPE).stdout.read()
+					abc_dirname=os.path.join(dir_name,'%s-%d' % (base_filename,i))
+
+					print abc_dirname
+					if os.path.isdir(abc_dirname):
+						print 'Disasm succeeded', abc_dirname
+						abc_dirnames.append(abc_dirname)
+				else:
+					break
+				i+=1
+
+			self.showDir(abc_dirnames)
+
+	def asm(self):
+		rabcasm=os.path.join(self.RABCDAsmPath,"rabcasm.exe")
+		abcreplace=os.path.join(self.RABCDAsmPath,"abcreplace.exe")
+
+		print 'self.SWFFilename:',self.SWFFilename
+		if self.SWFFilename:
+			dir_name=os.path.dirname(self.SWFFilename)
+			base_name='.'.join(os.path.basename(self.SWFFilename).split('.')[0:-1])
+			i=0
+			while True:
+				main_asasm_file=os.path.join(dir_name,'%s-%d.mod\%s-%d.main.asasm' % (base_name,i,base_name,i)).replace('/','\\')
+				abc_file=os.path.join(dir_name,'%s-%d.mod\%s-%d.main.abc' % (base_name,i,base_name,i)).replace('/','\\')
+
+				print 'main_asasm_file:',main_asasm_file
+				if not os.path.isfile(main_asasm_file):
+					break
+				print 'Assembling', main_asasm_file
+				print subprocess.Popen("%s %s" % (rabcasm,main_asasm_file), shell=True, stdout=subprocess.PIPE).stdout.read()
+
+				swf_outputfilename=os.path.join(dir_name,'%s-mod.swf' % base_name)
+
+				try:
+					shutil.copy(self.SWFFilename,swf_outputfilename)
+				except:
+					pass
+				print subprocess.Popen("%s %s %d %s" % (abcreplace,swf_outputfilename,i,abc_file), shell=True, stdout=subprocess.PIPE).stdout.read()
+				i+=1
+
+		"""
+		mkdir Util-0
+		copy Scripts\Util-0\* Util-0\
+
+		rabcasm.exe payload-0.mod\payload-0.main.asasm
+		abcreplace.exe payload-mod.swf_ 0 payload-0.mod\payload-0.main.abc
+
+		rabcasm.exe payload-1.mod\payload-1.main.asasm
+		abcreplace.exe payload-mod.swf_ 1 payload-1.mod\payload-1.main.abc
+		"""
+
+	def openDirectory(self):
 		dialog=QFileDialog()
 		dialog.setFileMode(QFileDialog.Directory)
 		dialog.setOption(QFileDialog.ShowDirsOnly)
 		directory=dialog.getExistingDirectory(self,"Choose Directory",os.getcwd())
-
 		if directory:
-			self.showDir(directory)
+			self.showDir([directory])
+
+	def addMethodTrace(self):
+		for directory in self.Directories:
+			self.asasm.Instrument(directory,directory+'.mod',[["AddMethodTrace",'']])
+
+	def addBasicBlockTrace(self):
+		for directory in self.Directories:
+			self.asasm.Instrument(directory,directory+'.mod',[["AddBasicBlockTrace",'']])
+
+	def addAPITrace(self):
+		for directory in self.Directories:
+			self.asasm.Instrument(directory,directory+'.mod',[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
 	def createMenus(self):
-		self.openAct=QAction("&Open...",
+		self.fileMenu=self.menuBar().addMenu("&File")
+		self.disasmAct=QAction("&Disasm...",
+									self,
+									triggered=self.disasm)
+		self.fileMenu.addAction(self.disasmAct)
+
+		self.asmAct=QAction("&Asm...",
+									self,
+									triggered=self.asm)
+		self.fileMenu.addAction(self.asmAct)
+
+		self.openAct=QAction("&Open folder...",
 									self,
 									shortcut=QKeySequence.Open,
 									statusTip="Open an existing folder", 
-									triggered=self.open)
-
-		self.fileMenu=self.menuBar().addMenu("&File")
+									triggered=self.openDirectory)
 		self.fileMenu.addAction(self.openAct)
 
-		self.classTreeViewMenu=self.menuBar().addMenu("&View")
+		self.instrumentMenu=self.menuBar().addMenu("&Instrument")
 
-	def showDir(self,dir):
+		self.addMethodTraceAct=QAction("&Add method traces...",
+									self,
+									triggered=self.addMethodTrace)
+		self.instrumentMenu.addAction(self.addMethodTraceAct)
+
+		self.addBasicBlockTraceAct=QAction("&Add basic block traces...",
+									self,
+									triggered=self.addBasicBlockTrace)
+		self.instrumentMenu.addAction(self.addBasicBlockTraceAct)
+
+		self.addAPITraceAct=QAction("&Add API traces...",
+									self,
+									triggered=self.addAPITrace)
+		self.instrumentMenu.addAction(self.addAPITraceAct)
+
+	def showDir(self,dirs):
+		self.Directories=dirs
 		self.asasm=ASASM()	
-		self.Assembly=self.asasm.RetrieveAssembly(dir)
+		self.Assembly=self.asasm.RetrieveAssemblies(dirs)
 
 		self.treeModel=TreeModel(("Name",))
 		self.treeModel.showClasses(self.Assembly)
@@ -379,7 +494,7 @@ if __name__=='__main__':
 	window=MainWindow()
 
 	if len(sys.argv)>1:
-		window.showDir(sys.argv[1])
+		window.showDir(sys.argv[1:])
 
 	window.show()
 	#splash.finish(window)
