@@ -234,17 +234,21 @@ class ASASM:
 		fd.close()
 
 	def WriteToFiles(self,target_dir,update_code=True):
-		for (file,(parsed_lines,methods)) in self.Assemblies.items():
-			new_filename=os.path.join(target_dir,file)
+		for root_dir in self.Assemblies.keys():
+			for (file,(parsed_lines,methods)) in self.Assemblies[root_dir].items():
+				if self.DebugWriteToFile>0:
+					print '* WriteToFiles:', file
 
-			new_folder=os.path.dirname(new_filename)
-			if not os.path.isdir(new_folder):
-				try:
-					os.makedirs(new_folder)
-				except:
-					pass
+				new_filename=os.path.join(target_dir,file)
 
-			self.WriteToFile(new_filename, parsed_lines, methods,update_code=update_code)
+				new_folder=os.path.dirname(new_filename)
+				if not os.path.isdir(new_folder):
+					try:
+						os.makedirs(new_folder)
+					except:
+						pass
+
+				self.WriteToFile(new_filename, parsed_lines, methods,update_code=update_code)
 
 	DebugReplace=0
 	def ReplaceSymbol(self,parsed_lines,orig,replace):
@@ -396,30 +400,31 @@ class ASASM:
 
 	DebugUpdateParsedLines=0
 	def UpdateParsedLines(self,update_code=True):
-		for file in self.Assemblies.keys():
-			(parsed_lines,methods)=self.Assemblies[file]
-			for (refid,(blocks,maps,labels,parents,body_parameters)) in methods.items():
-				body_parameter_lines=[]
-				for (key,value) in body_parameters.items():
-					if key!='try':
-						body_parameter_lines.append(['',key,value,''])
+		for root_dir in self.Assemblies.keys():
+			for file in self.Assemblies[root_dir].keys():
+				(parsed_lines,methods)=self.Assemblies[root_dir][file]
+				for (refid,(blocks,maps,labels,parents,body_parameters)) in methods.items():
+					body_parameter_lines=[]
+					for (key,value) in body_parameters.items():
+						if key!='try':
+							body_parameter_lines.append(['',key,value,''])
 
-				body_parameter_lines.append(['','code','',''])
-				code_parsed_lines=[]
-				if update_code:
-					code_parsed_lines=self.ConstructCode(blocks,labels)
-				else:
-					code_parsed_lines=self.GetParsedLines(parsed_lines,refid,'code')
+					body_parameter_lines.append(['','code','',''])
+					code_parsed_lines=[]
+					if update_code:
+						code_parsed_lines=self.ConstructCode(blocks,labels)
+					else:
+						code_parsed_lines=self.GetParsedLines(parsed_lines,refid,'code')
 
-				body_parameter_lines+=code_parsed_lines
-				body_parameter_lines.append(['','end','','code'])
+					body_parameter_lines+=code_parsed_lines
+					body_parameter_lines.append(['','end','','code'])
 
-				if body_parameters.has_key('try'):
-					body_parameter_lines.append(['','try',body_parameters['try'],''])
+					if body_parameters.has_key('try'):
+						body_parameter_lines.append(['','try',body_parameters['try'],''])
 
-				parsed_lines=self.ReplaceParsedLines(parsed_lines,refid,body_parameter_lines,'body')
+					parsed_lines=self.ReplaceParsedLines(parsed_lines,refid,body_parameter_lines,'body')
 
-			self.Assemblies[file][0]=parsed_lines
+				self.Assemblies[root_dir][file][0]=parsed_lines
 
 	DebugMethods=0
 	def ParseMethod(self,parsed_lines,target_method=''):
@@ -609,15 +614,16 @@ class ASASM:
 		methods=self.ParseMethod(parsed_lines,target_method)
 		return [parsed_lines,methods]
 
-	def RetrieveAssembly(self,folder,target_file='',target_method=''):
-		for relative_file in self.EnumDir(folder):
+	def RetrieveAssembly(self,root_dir,target_file='',target_method=''):
+		self.Assemblies[root_dir]={}
+		for relative_file in self.EnumDir(root_dir):
 			if target_file=='' or target_file==relative_file:
-				file=os.path.join(folder, relative_file)
+				file=os.path.join(root_dir, relative_file)
 
 				[parsed_lines,methods]=self.RetrieveFile(file,target_method)
 				if self.DebugMethods>0:
 					pprint.pprint(methods)
-				self.Assemblies[relative_file]=[parsed_lines,methods]
+				self.Assemblies[root_dir][relative_file]=[parsed_lines,methods]
 
 		return self.Assemblies
 
@@ -851,67 +857,68 @@ class ASASM:
 		[local_names,api_names]=self.GetNames()
 
 		update_code=True
-		for file in self.Assemblies.keys():
-			for (operation,options) in operations:
-				if self.DebugInstrument >0:
-					print '* Instrumenting', file, operation,options
+		for root_dir in self.Assemblies.keys():
+			for file in self.Assemblies[root_dir].keys():
+				for (operation,options) in operations:
+					if self.DebugInstrument >0:
+						print '* Instrumenting', file, operation,options
 
-				if operation=="AddBasicBlockTrace":
-					self.Assemblies[file][1]=self.AddBasicBlockTrace(self.Assemblies[file][1],filename=file)
+					if operation=="AddBasicBlockTrace":
+						self.Assemblies[root_dir][file][1]=self.AddBasicBlockTrace(self.Assemblies[root_dir][file][1],filename=file)
 
-				if operation=="AddAPITrace":
-					self.Assemblies[file][1]=self.AddAPITrace(self.Assemblies[file][1],filename=file,api_names=api_names)
+					if operation=="AddAPITrace":
+						self.Assemblies[root_dir][file][1]=self.AddAPITrace(self.Assemblies[root_dir][file][1],filename=file,api_names=api_names)
 
-				if operation=="Replace":
-					for [orig,replace] in options:
-						parsed_lines=self.ReplaceSymbol(parsed_lines,orig,replace)
-						"""
-						if not filename_replaced and basename.find(orig)>=0:
-							new_filename=os.path.join(new_folder,basename.replace(orig,replace))
-							filename_replaced=True
-						"""
+					if operation=="Replace":
+						for [orig,replace] in options:
+							parsed_lines=self.ReplaceSymbol(parsed_lines,orig,replace)
+							"""
+							if not filename_replaced and basename.find(orig)>=0:
+								new_filename=os.path.join(new_folder,basename.replace(orig,replace))
+								filename_replaced=True
+							"""
 
-				if operation=="AddMethodTrace":
-					if self.DebugInstrument>0:
-						print 'Calling AddMethodTrace'
-					self.Assemblies[file][0]=self.AddMethodTrace(self.Assemblies[file][0])
-
-					if self.DebugInstrument>0:
-						print 'Calling AdjustParameter'
-
-					for refid in self.Assemblies[file][1].keys():
-						self.Assemblies[file][1][refid][4]=self.AdjustParameter(self.Assemblies[file][1][refid][4],'maxstack',5)
-
-					if self.DebugInstrument>1:
-						print '='*80
-						pprint.pprint(self.Assemblies[file][0])
-						print ''
-
-					if self.DebugInstrument>0:
-						print 'AddMethodTrace complete'
-
-					update_code=False
-
-				if operation=="Include":
-					if file[-1*len('.main.asasm'):]=='.main.asasm':
+					if operation=="AddMethodTrace":
 						if self.DebugInstrument>0:
-							print 'Updating', file
-						[process_lines,methods]=self.Assemblies[file]
-						for index in range(0,len(process_lines),1):
-							(prefix,keyword,parameter,comment)=process_lines[index]
-							if keyword=='end':
-								if self.DebugInstrument>0:
-									print 'Inserting #include statement:', options
-								include_lines=[]
-								for include_file in options:
-									include_lines.append([' ',"#include",'"%s"' % include_file,''])
-								process_lines[index:index]=include_lines
-								break
+							print 'Calling AddMethodTrace'
+						self.Assemblies[root_dir][file][0]=self.AddMethodTrace(self.Assemblies[root_dir][file][0])
+
+						if self.DebugInstrument>0:
+							print 'Calling AdjustParameter'
+
+						for refid in self.Assemblies[root_dir][file][1].keys():
+							self.Assemblies[root_dir][file][1][refid][4]=self.AdjustParameter(self.Assemblies[root_dir][file][1][refid][4],'maxstack',5)
 
 						if self.DebugInstrument>1:
-							pprint.pprint(process_lines)
+							print '='*80
+							pprint.pprint(self.Assemblies[root_dir][file][0])
+							print ''
 
-						self.Assemblies[file][0]=process_lines
+						if self.DebugInstrument>0:
+							print 'AddMethodTrace complete'
+
+						update_code=False
+
+					if operation=="Include":
+						if file[-1*len('.main.asasm'):]=='.main.asasm':
+							if self.DebugInstrument>0:
+								print 'Updating', file
+							[process_lines,methods]=self.Assemblies[root_dir][file]
+							for index in range(0,len(process_lines),1):
+								(prefix,keyword,parameter,comment)=process_lines[index]
+								if keyword=='end':
+									if self.DebugInstrument>0:
+										print 'Inserting #include statement:', options
+									include_lines=[]
+									for include_file in options:
+										include_lines.append([' ',"#include",'"%s"' % include_file,''])
+									process_lines[index:index]=include_lines
+									break
+
+							if self.DebugInstrument>1:
+								pprint.pprint(process_lines)
+
+							self.Assemblies[root_dir][file][0]=process_lines
 
 		if self.DebugInstrument>0:
 			print 'Write to files', target_dir
@@ -1133,24 +1140,24 @@ class ASASM:
 
 	DebugNames=0
 	def GetNames(self):
-
 		local_namespaces={}
 		refids={}
-		for [class_name,[parsed_lines,methods]] in self.Assemblies.items():
-			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
-				refids[refid]=1
+		for root_dir in self.Assemblies.keys():
+			for [class_name,[parsed_lines,methods]] in self.Assemblies[root_dir].items():
+				for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
+					refids[refid]=1
 
-			for [prefix,keyword,parameter,comment] in parsed_lines:
-				if keyword=='instance':
-					local_namespaces[parameter]=1
+				for [prefix,keyword,parameter,comment] in parsed_lines:
+					if keyword=='instance':
+						local_namespaces[parameter]=1
 
-				elif keyword=='trait':
-					trait_elements=self.ParseTraitLine(parameter)
-					if len(trait_elements)>1:
-						local_namespaces[trait_elements[1]]=1
-					else:
-						if self.DebugNames>0:
-							print parameter
+					elif keyword=='trait':
+						trait_elements=self.ParseTraitLine(parameter)
+						if len(trait_elements)>1:
+							local_namespaces[trait_elements[1]]=1
+						else:
+							if self.DebugNames>0:
+								print parameter
 
 		if self.DebugNames>0:
 			print refids.keys()
@@ -1158,86 +1165,87 @@ class ASASM:
 
 		local_names={}
 		api_names={}
-		for [class_name,[parsed_lines,methods]] in self.Assemblies.items():
-			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
-				for [block_id,block] in blocks.items():
-					block_line_no=0
-					for [op,operand] in block:
-						if not operand:
-							block_line_no+=1
-							continue
+		for root_dir in self.Assemblies.keys():
+			for [class_name,[parsed_lines,methods]] in self.Assemblies[root_dir].items():
+				for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
+					for [block_id,block] in blocks.items():
+						block_line_no=0
+						for [op,operand] in block:
+							if not operand:
+								block_line_no+=1
+								continue
 
-						if operand.startswith('"'):
-							pass
-						elif operand.startswith('QName('):
-							if self.DebugNames>0:
-								print '*', operand
-							
-							qnames=self.ParseArray(operand)
-							qname=qnames[0]
-
-							if local_namespaces.has_key(qname):
+							if operand.startswith('"'):
+								pass
+							elif operand.startswith('QName('):
 								if self.DebugNames>0:
-									print 'Local Name:', qname, op, refid, block_id, block_line_no
+									print '*', operand
+							
+								qnames=self.ParseArray(operand)
+								qname=qnames[0]
 
-								if not local_names.has_key(qname):
-									local_names[qname]=[]
-								local_names[qname].append([op, refid, block_id, block_line_no])
-							else:
-								qname_parts=self.ParseQName(qname)
-								qname=self.AsmQName(qname_parts,remove_ns_arg=True)
 								if local_namespaces.has_key(qname):
 									if self.DebugNames>0:
 										print 'Local Name:', qname, op, refid, block_id, block_line_no
 
-										if not local_names.has_key(qname):
-											local_names[qname]=[]
-										local_names[qname].append([op, class_name, refid, block_id, block_line_no])
+									if not local_names.has_key(qname):
+										local_names[qname]=[]
+									local_names[qname].append([op, refid, block_id, block_line_no])
 								else:
-									if self.DebugNames>0:
-										print 'API Name:', qname, op, refid, block_id, block_line_no
+									qname_parts=self.ParseQName(qname)
+									qname=self.AsmQName(qname_parts,remove_ns_arg=True)
+									if local_namespaces.has_key(qname):
+										if self.DebugNames>0:
+											print 'Local Name:', qname, op, refid, block_id, block_line_no
+
+											if not local_names.has_key(qname):
+												local_names[qname]=[]
+											local_names[qname].append([op, class_name, refid, block_id, block_line_no])
+									else:
+										if self.DebugNames>0:
+											print 'API Name:', qname, op, refid, block_id, block_line_no
 									
-									if not api_names.has_key(qname):
-											api_names[qname]=[]
-									api_names[qname].append([op, class_name, refid, block_id, block_line_no])
+										if not api_names.has_key(qname):
+												api_names[qname]=[]
+										api_names[qname].append([op, class_name, refid, block_id, block_line_no])
 
-							ret=self.ParseQName(qname)
-							if len(ret[1])>0:
-								[namespace_note,arg]=ret[1]
-								[namespace,param]=namespace_note
+								ret=self.ParseQName(qname)
+								if len(ret[1])>0:
+									[namespace_note,arg]=ret[1]
+									[namespace,param]=namespace_note
 
+									if self.DebugNames>0:
+										print namespace
+										print param
+									arg=arg[1:-1]
+
+									if refids.has_key(arg):
+										print 'Local arg:', arg
+
+							elif operand.startswith('MultinameL'):
 								if self.DebugNames>0:
-									print namespace
-									print param
-								arg=arg[1:-1]
+									print '*', operand
+									pprint.pprint(self.ParseMultiname(operand))
+									print ''
+							elif operand.startswith('Multiname'):
+								if self.DebugNames>0:
+									print '*', operand
+									pprint.pprint(self.ParseMultiname(operand))
+									print ''
+							elif operand.startswith('TypeName'):
+								if self.DebugNames>0:
+									print '*', operand
+									print ''
+							elif operand=='null':
+								pass
+							elif operand[0]=='L':
+								pass
+							elif ord(operand[0])>=ord('0') and ord(operand[0])<=ord('9') or operand[0]=='-':
+								pass
+							else:
+								print operand
 
-								if refids.has_key(arg):
-									print 'Local arg:', arg
-
-						elif operand.startswith('MultinameL'):
-							if self.DebugNames>0:
-								print '*', operand
-								pprint.pprint(self.ParseMultiname(operand))
-								print ''
-						elif operand.startswith('Multiname'):
-							if self.DebugNames>0:
-								print '*', operand
-								pprint.pprint(self.ParseMultiname(operand))
-								print ''
-						elif operand.startswith('TypeName'):
-							if self.DebugNames>0:
-								print '*', operand
-								print ''
-						elif operand=='null':
-							pass
-						elif operand[0]=='L':
-							pass
-						elif ord(operand[0])>=ord('0') and ord(operand[0])<=ord('9') or operand[0]=='-':
-							pass
-						else:
-							print operand
-
-						block_line_no+=1
+							block_line_no+=1
 
 		if self.DebugNames>0:
 			pprint.pprint(local_names)
