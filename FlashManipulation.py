@@ -158,8 +158,8 @@ class ASASM:
 		fd.close()
 		return parsed_lines
 
-	def WriteToFile(self,filename, parsed_lines):
-		fd=open(filename,'w')
+	DebugWriteToFile=0
+	def WriteLinesToFile(self,fd,parsed_lines):
 		for [prefix,keyword,parameter,comment] in parsed_lines:
 			line=prefix+keyword
 			if parameter:
@@ -169,9 +169,71 @@ class ASASM:
 				line+=" ; "+comment
 			line+='\n'
 			fd.write(line)
+
+	def WriteToFile(self,filename,parsed_lines,methods,update_code=True):
+		if self.DebugWriteToFile>0:
+			print filename, methods.keys()
+
+		fd=open(filename,'w')
+		refid=''
+		parents=[]
+		for [prefix,keyword,parameter,comment] in parsed_lines:
+			if keyword in self.BlockKeywords:
+				if parameter[-3:]!='end':
+					parents.append([keyword,parameter])
+
+				if self.DebugWriteToFile>0:
+					print '* parents:',parents
+					
+			elif keyword=='end':
+				if self.DebugWriteToFile>0:
+					print '- end:',refid
+					print prefix,keyword,parameter,comment
+					pprint.pprint(parents)
+
+				if len(parents)>0:
+					del parents[-1]
+				else:
+					print '* Error parsing', refid
+					print prefix,keyword,parameter,comment
+
+			elif keyword=='refid':
+				refid=parameter[1:-1]
+				if methods.has_key(refid):
+					(blocks,maps,labels,method_parents,body_parameters)=methods[refid]
+				else:
+					blocks=maps=labels=body_parameters={}
+					method_parents=[]
+					
+				if self.DebugWriteToFile>0:
+					print '*'*80
+					print 'refid:', refid
+
+			elif len(parents)>0:
+				if parents[-1][0]=='body' and body_parameters.has_key(keyword):
+					if self.DebugWriteToFile>0:
+						print '> Updaing %s with %s' % (keyword, body_parameters[keyword])
+					parameter=body_parameters[keyword]
+
+				elif update_code and parents[-1][0]=='code':
+					continue
+
+			line=prefix+keyword
+			if parameter:
+				line+=" "+parameter
+
+			if comment:
+				line+=" ; "+comment
+			line+='\n'
+			fd.write(line)
+
+			if update_code and keyword=='code':
+				code_parsed_lines=self.ConstructCode(blocks,labels)
+				self.WriteLinesToFile(fd,code_parsed_lines)
+
 		fd.close()
 
-	def WriteToFiles(self,target_dir):
+	def WriteToFiles(self,target_dir,update_code=True):
 		for (file,(parsed_lines,methods)) in self.Assemblies.items():
 			new_filename=os.path.join(target_dir,file)
 
@@ -181,7 +243,8 @@ class ASASM:
 					os.makedirs(new_folder)
 				except:
 					pass
-			self.WriteToFile(new_filename, parsed_lines)
+
+			self.WriteToFile(new_filename, parsed_lines, methods,update_code=update_code)
 
 	DebugReplace=0
 	def ReplaceSymbol(self,parsed_lines,orig,replace):
@@ -237,16 +300,18 @@ class ASASM:
 			print ''
 		return [blocks_by_id,maps_by_id,id2name_maps]
 
-	DebugReplaceParsedLines=0
+	DebugReplaceParsedLines=1
 	def ReplaceParsedLines(self,parsed_lines,target_refid,code_parsed_lines,type):
 		start_index=0
 		start_level=0
 		end_index=0
 		index=0
 		level=0
+
 		for [prefix,keyword,parameter,comment] in parsed_lines:
 			if keyword=='refid':
 				refid=parameter[1:-1]
+
 			elif keyword in self.BlockKeywords:
 				if keyword==type:
 					if refid==target_refid:
@@ -264,10 +329,12 @@ class ASASM:
 			index+=1
 
 		if self.DebugReplaceParsedLines>0:
-			print 'Replacing %d - %d ' % (start_index,end_index)
-			pprint.pprint(parsed_lines[start_index:end_index])
-			pprint.pprint(code_parsed_lines)
+			print 'Replacing %s %d - %d ' % (target_refid, start_index,end_index)
+			if self.DebugReplaceParsedLines>1:
+				pprint.pprint(parsed_lines[start_index:end_index])
+				pprint.pprint(code_parsed_lines)
 			print ''
+
 		parsed_lines[start_index:end_index]=code_parsed_lines
 
 		return parsed_lines
@@ -282,18 +349,18 @@ class ASASM:
 		for [prefix,keyword,parameter,comment] in parsed_lines:
 			if keyword=='refid':
 				refid=parameter[1:-1]
+
 			elif keyword in self.BlockKeywords:
 				if keyword==type:
 					if refid==target_refid:
 						start_index=index+1
 						start_level=level
-
 				level+=1
+
 			elif keyword=='end':
 				if start_index>0 and start_level==level:
 					end_index=index-1
 					break
-
 				level-=1
 
 			index+=1
@@ -327,21 +394,23 @@ class ASASM:
 
 		return parsed_lines
 
+	DebugUpdateParsedLines=0
 	def UpdateParsedLines(self,update_code=True):
 		for file in self.Assemblies.keys():
 			(parsed_lines,methods)=self.Assemblies[file]
 			for (refid,(blocks,maps,labels,parents,body_parameters)) in methods.items():
-				
 				body_parameter_lines=[]
 				for (key,value) in body_parameters.items():
 					if key!='try':
 						body_parameter_lines.append(['',key,value,''])
 
 				body_parameter_lines.append(['','code','',''])
+				code_parsed_lines=[]
 				if update_code:
 					code_parsed_lines=self.ConstructCode(blocks,labels)
 				else:
 					code_parsed_lines=self.GetParsedLines(parsed_lines,refid,'code')
+
 				body_parameter_lines+=code_parsed_lines
 				body_parameter_lines.append(['','end','','code'])
 
@@ -581,7 +650,7 @@ class ASASM:
 		new_parsed_lines=[]
 		refid=''
 		for [prefix,keyword,parameter,comment] in parsed_lines:
-			if self.DebugMethodTrace>0:
+			if self.DebugMethodTrace>1:
 				print '>',prefix,keyword,parameter,comment
 
 			if keyword in self.BlockKeywords:
@@ -595,7 +664,12 @@ class ASASM:
 					print '* end tag:',refid
 					print prefix,keyword,parameter,comment
 					pprint.pprint(parents)
+
+				if len(parents)>0:
 					del parents[-1]
+				else:
+					print '* Error parsing', refid
+					print prefix,keyword,parameter,comment
 
 			elif keyword=='refid':
 				refid=parameter[1:-1]
@@ -649,7 +723,7 @@ class ASASM:
 						print line
 					print ''
 
-				if self.DebugBasicBlockTrace >-1:
+				if self.DebugBasicBlockTrace >0:
 					print 'Instrumenting',refid,parents
 
 				if parents[-3][0]=='method' and labels.has_key(block_id) and blocks[block_id][0][0]!='label':
@@ -709,8 +783,12 @@ class ASASM:
 					if max_stack_count>0:
 						orig_localcount=int(body_parameters['localcount'])
 						new_localcount=str(orig_localcount+max_stack_count+1)
-						print 'Increasing localcount %s -> %s' % (body_parameters['localcount'], new_localcount)
+
+						if self.DebugAddAPITrace >0:
+							print 'Increasing localcount %s -> %s' % (body_parameters['localcount'], new_localcount)
+
 						body_parameters['localcount']=new_localcount
+
 						if self.DebugAddAPITrace >0:
 							print "Max stack count:", type, refid, max_stack_count
 
@@ -762,10 +840,17 @@ class ASASM:
 
 	DebugInstrument=0
 	def Instrument(self,dir,target_dir,operations=[]):
+		if self.DebugInstrument>0:
+			print '* Parsing', dir
+
 		self.RetrieveAssembly(dir)
+
+		if self.DebugInstrument>0:
+			print '* Parsing complete'
 
 		[local_names,api_names]=self.GetNames()
 
+		update_code=True
 		for file in self.Assemblies.keys():
 			for (operation,options) in operations:
 				if self.DebugInstrument >0:
@@ -773,11 +858,9 @@ class ASASM:
 
 				if operation=="AddBasicBlockTrace":
 					self.Assemblies[file][1]=self.AddBasicBlockTrace(self.Assemblies[file][1],filename=file)
-					self.UpdateParsedLines()
 
 				if operation=="AddAPITrace":
 					self.Assemblies[file][1]=self.AddAPITrace(self.Assemblies[file][1],filename=file,api_names=api_names)
-					self.UpdateParsedLines()
 
 				if operation=="Replace":
 					for [orig,replace] in options:
@@ -789,33 +872,51 @@ class ASASM:
 						"""
 
 				if operation=="AddMethodTrace":
+					if self.DebugInstrument>0:
+						print 'Calling AddMethodTrace'
 					self.Assemblies[file][0]=self.AddMethodTrace(self.Assemblies[file][0])
+
+					if self.DebugInstrument>0:
+						print 'Calling AdjustParameter'
+
 					for refid in self.Assemblies[file][1].keys():
 						self.Assemblies[file][1][refid][4]=self.AdjustParameter(self.Assemblies[file][1][refid][4],'maxstack',5)
 
-					self.UpdateParsedLines(update_code=False)
-					if self.DebugMethodTrace>0:
+					if self.DebugInstrument>1:
 						print '='*80
 						pprint.pprint(self.Assemblies[file][0])
 						print ''
 
+					if self.DebugInstrument>0:
+						print 'AddMethodTrace complete'
+
+					update_code=False
+
 				if operation=="Include":
 					if file[-1*len('.main.asasm'):]=='.main.asasm':
-						print file
+						if self.DebugInstrument>0:
+							print 'Updating', file
 						[process_lines,methods]=self.Assemblies[file]
 						for index in range(0,len(process_lines),1):
 							(prefix,keyword,parameter,comment)=process_lines[index]
 							if keyword=='end':
-								print 'Inserting', options
+								if self.DebugInstrument>0:
+									print 'Inserting #include statement:', options
 								include_lines=[]
 								for include_file in options:
 									include_lines.append([' ',"#include",'"%s"' % include_file,''])
 								process_lines[index:index]=include_lines
 								break
-						pprint.pprint(process_lines)
+
+						if self.DebugInstrument>1:
+							pprint.pprint(process_lines)
+
 						self.Assemblies[file][0]=process_lines
 
-		self.WriteToFiles(target_dir)
+		if self.DebugInstrument>0:
+			print 'Write to files', target_dir
+
+		self.WriteToFiles(target_dir,update_code=update_code)
 
 	DebugParse=0
 	def ParseTraitLine(self,line):
@@ -1245,7 +1346,6 @@ if __name__=='__main__':
 
 	elif options.api:
 		asasm=ASASM()
-		print 'APITrace'
 		asasm.Instrument(dir,target_dir,[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
 	elif options.include:
