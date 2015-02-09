@@ -239,6 +239,7 @@ class MainWindow(QMainWindow):
 		self.restoreUI()
 		self.show()
 
+	DebugFileOperation=0
 	def disasm(self):
 		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
 		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
@@ -247,7 +248,9 @@ class MainWindow(QMainWindow):
 
 		if filename:
 			self.SWFFilename=filename
-			print subprocess.Popen("%s %s" % (abcexport,filename), shell=True, stdout=subprocess.PIPE).stdout.read()
+
+			if self.DebugFileOperation>0:
+				print subprocess.Popen("%s %s" % (abcexport,filename), shell=True, stdout=subprocess.PIPE).stdout.read()
 
 			dir_name=os.path.dirname(filename)
 			base_filename='.'.join(os.path.basename(filename).split('.')[0:-1])
@@ -259,13 +262,20 @@ class MainWindow(QMainWindow):
 				abc_filename=abc_filename.replace('/','\\')
 
 				if os.path.isfile(abc_filename):
-					print 'abc_filename:', abc_filename
-					print subprocess.Popen("%s %s" % (rabcdasm,abc_filename), shell=True, stdout=subprocess.PIPE).stdout.read()
+					if self.DebugFileOperation>0:
+						print 'abc_filename:', abc_filename
+					output=subprocess.Popen("%s %s" % (rabcdasm,abc_filename), shell=True, stdout=subprocess.PIPE).stdout.read()
+
+					if self.DebugFileOperation>0:
+						print output
+
 					abc_dirname=os.path.join(dir_name,'%s-%d' % (base_filename,i))
 
-					print abc_dirname
+					if self.DebugFileOperation>0:
+						print 'abc_dirname:', abc_dirname
 					if os.path.isdir(abc_dirname):
-						print 'Disasm succeeded', abc_dirname
+						if self.DebugFileOperation>0:
+							print 'Disasm succeeded', abc_dirname
 						abc_dirnames.append(abc_dirname)
 				else:
 					break
@@ -277,7 +287,8 @@ class MainWindow(QMainWindow):
 		rabcasm=os.path.join(self.RABCDAsmPath,"rabcasm.exe")
 		abcreplace=os.path.join(self.RABCDAsmPath,"abcreplace.exe")
 
-		print 'self.SWFFilename:',self.SWFFilename
+		if self.DebugFileOperation>0:	
+			print 'self.SWFFilename:',self.SWFFilename
 		if self.SWFFilename:
 			dir_name=os.path.dirname(self.SWFFilename)
 			base_name='.'.join(os.path.basename(self.SWFFilename).split('.')[0:-1])
@@ -286,11 +297,17 @@ class MainWindow(QMainWindow):
 				main_asasm_file=os.path.join(dir_name,'%s-%d.mod\%s-%d.main.asasm' % (base_name,i,base_name,i)).replace('/','\\')
 				abc_file=os.path.join(dir_name,'%s-%d.mod\%s-%d.main.abc' % (base_name,i,base_name,i)).replace('/','\\')
 
-				print 'main_asasm_file:',main_asasm_file
+				if self.DebugFileOperation>0:
+					print 'main_asasm_file:',main_asasm_file
 				if not os.path.isfile(main_asasm_file):
 					break
-				print 'Assembling', main_asasm_file
-				print subprocess.Popen("%s %s" % (rabcasm,main_asasm_file), shell=True, stdout=subprocess.PIPE).stdout.read()
+
+				if self.DebugFileOperation>0:
+					print 'Assembling', main_asasm_file
+				output=subprocess.Popen("%s %s" % (rabcasm,main_asasm_file), shell=True, stdout=subprocess.PIPE).stdout.read()
+				if self.DebugFileOperation>0:
+					print output
+
 
 				swf_outputfilename=os.path.join(dir_name,'%s-mod.swf' % base_name)
 
@@ -298,18 +315,15 @@ class MainWindow(QMainWindow):
 					shutil.copy(self.SWFFilename,swf_outputfilename)
 				except:
 					pass
-				print subprocess.Popen("%s %s %d %s" % (abcreplace,swf_outputfilename,i,abc_file), shell=True, stdout=subprocess.PIPE).stdout.read()
+				output=subprocess.Popen("%s %s %d %s" % (abcreplace,swf_outputfilename,i,abc_file), shell=True, stdout=subprocess.PIPE).stdout.read()
+				if self.DebugFileOperation>0:
+					print output
+
 				i+=1
 
 		"""
 		mkdir Util-0
 		copy Scripts\Util-0\* Util-0\
-
-		rabcasm.exe payload-0.mod\payload-0.main.asasm
-		abcreplace.exe payload-mod.swf_ 0 payload-0.mod\payload-0.main.abc
-
-		rabcasm.exe payload-1.mod\payload-1.main.asasm
-		abcreplace.exe payload-mod.swf_ 1 payload-1.mod\payload-1.main.abc
 		"""
 
 	def openDirectory(self):
@@ -322,6 +336,7 @@ class MainWindow(QMainWindow):
 
 	def addMethodTrace(self):
 		for directory in self.Directories:
+			print 'directory', directory+'.mod'
 			self.asasm.Instrument(directory,directory+'.mod',[["AddMethodTrace",'']])
 
 	def addBasicBlockTrace(self):
