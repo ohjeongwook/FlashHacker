@@ -99,17 +99,18 @@ class TreeModel(QAbstractItemModel):
 			dir_item.appendChild(item)
 
 	def showClasses(self,assemblies):
-		class_names=assemblies.keys()
-		class_names.sort()
+		for root_dir in assemblies.keys():
+			class_names=assemblies[root_dir].keys()
+			class_names.sort()
 
-		for class_name in class_names:
-			dir_item=TreeItem((class_name,))
-			self.rootItem.appendChild(dir_item)
+			for class_name in class_names:
+				dir_item=TreeItem((class_name,))
+				self.rootItem.appendChild(dir_item)
 
-			[parsed_lines,methods]=assemblies[class_name]
-			for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
-				item=TreeItem((refid,),dir_item,(class_name, refid))
-				dir_item.appendChild(item)
+				[parsed_lines,methods]=assemblies[root_dir][class_name]
+				for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
+					item=TreeItem((refid,),dir_item,(root_dir, class_name, refid))
+					dir_item.appendChild(item)
 
 	def showAPIs(self,api_names):
 		api_names_list=api_names.keys()
@@ -117,8 +118,8 @@ class TreeModel(QAbstractItemModel):
 		for api_name in api_names_list:
 			dir_item=TreeItem((api_name,"API"))
 			self.rootItem.appendChild(dir_item)
-			for [op,class_name,refid,block_id,block_line_no] in api_names[api_name]:
-				item=TreeItem((refid,op,),dir_item,(op,class_name,refid,block_id,block_line_no))
+			for [op,root_dir,class_name,refid,block_id,block_line_no] in api_names[api_name]:
+				item=TreeItem((refid,op,),dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
 				dir_item.appendChild(item)
 
 	def setupModelData(self):
@@ -240,7 +241,7 @@ class MainWindow(QMainWindow):
 		self.show()
 
 	DebugFileOperation=0
-	def disasm(self):
+	def open(self):
 		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
 		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
 		filename = QFileDialog.getOpenFileName(self,
@@ -283,19 +284,22 @@ class MainWindow(QMainWindow):
 
 			self.showDir(abc_dirnames)
 
-	def asm(self):
+	def save(self):
 		rabcasm=os.path.join(self.RABCDAsmPath,"rabcasm.exe")
 		abcreplace=os.path.join(self.RABCDAsmPath,"abcreplace.exe")
 
 		if self.DebugFileOperation>0:	
 			print 'self.SWFFilename:',self.SWFFilename
+
 		if self.SWFFilename:
 			dir_name=os.path.dirname(self.SWFFilename)
 			base_name='.'.join(os.path.basename(self.SWFFilename).split('.')[0:-1])
 			i=0
+			target_root_dir=self.SWFFilename+'.mod'
+
 			while True:
-				main_asasm_file=os.path.join(dir_name,'%s-%d.mod\%s-%d.main.asasm' % (base_name,i,base_name,i)).replace('/','\\')
-				abc_file=os.path.join(dir_name,'%s-%d.mod\%s-%d.main.abc' % (base_name,i,base_name,i)).replace('/','\\')
+				main_asasm_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.asasm' % (base_name,i,base_name,i)).replace('/','\\')
+				abc_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.abc' % (base_name,i,base_name,i)).replace('/','\\')
 
 				if self.DebugFileOperation>0:
 					print 'main_asasm_file:',main_asasm_file
@@ -304,19 +308,33 @@ class MainWindow(QMainWindow):
 
 				if self.DebugFileOperation>0:
 					print 'Assembling', main_asasm_file
-				output=subprocess.Popen("%s %s" % (rabcasm,main_asasm_file), shell=True, stdout=subprocess.PIPE).stdout.read()
-				if self.DebugFileOperation>0:
+
+				cmdline="%s %s" % (rabcasm,main_asasm_file)
+
+				if self.DebugFileOperation>-1:
+					print '* Executing: %s' % cmdline
+
+				output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
+				if self.DebugFileOperation>-1:
 					print output
 
+				swf_outputfilename=os.path.join(target_root_dir,'%s-mod.swf' % base_name).replace('/','\\')
 
-				swf_outputfilename=os.path.join(dir_name,'%s-mod.swf' % base_name)
-
+				if self.DebugFileOperation>0:
+					print 'swf_outputfilename:', swf_outputfilename
 				try:
 					shutil.copy(self.SWFFilename,swf_outputfilename)
 				except:
-					pass
-				output=subprocess.Popen("%s %s %d %s" % (abcreplace,swf_outputfilename,i,abc_file), shell=True, stdout=subprocess.PIPE).stdout.read()
-				if self.DebugFileOperation>0:
+					import traceback
+					traceback.print_exc()
+
+				cmdline="%s %s %d %s" % (abcreplace,swf_outputfilename,i,abc_file)
+
+				if self.DebugFileOperation>-1:
+					print '* Executing: %s' % cmdline
+
+				output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
+				if self.DebugFileOperation>-1:
 					print output
 
 				i+=1
@@ -335,36 +353,35 @@ class MainWindow(QMainWindow):
 			self.showDir([directory])
 
 	def addMethodTrace(self):
-		for directory in self.Directories:
-			print 'directory', directory+'.mod'
-			self.asasm.Instrument(directory,directory+'.mod',[["AddMethodTrace",'']])
+		target_root_dir=self.SWFFilename+'.mod'
+		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddMethodTrace",'']])
 
 	def addBasicBlockTrace(self):
-		for directory in self.Directories:
-			self.asasm.Instrument(directory,directory+'.mod',[["AddBasicBlockTrace",'']])
+		target_root_dir=self.SWFFilename+'.mod'
+		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddBasicBlockTrace",'']])
 
 	def addAPITrace(self):
-		for directory in self.Directories:
-			self.asasm.Instrument(directory,directory+'.mod',[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
+		target_root_dir=self.SWFFilename+'.mod'
+		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
 	def createMenus(self):
 		self.fileMenu=self.menuBar().addMenu("&File")
-		self.disasmAct=QAction("&Disasm...",
+		self.openAct=QAction("&Open SWF file...",
 									self,
-									triggered=self.disasm)
-		self.fileMenu.addAction(self.disasmAct)
+									triggered=self.open)
+		self.fileMenu.addAction(self.openAct)
 
-		self.asmAct=QAction("&Asm...",
+		self.saveAct=QAction("&Save...",
 									self,
-									triggered=self.asm)
-		self.fileMenu.addAction(self.asmAct)
+									triggered=self.save)
+		self.fileMenu.addAction(self.saveAct)
 
-		self.openAct=QAction("&Open folder...",
+		self.openDirAct=QAction("&Open directory...",
 									self,
 									shortcut=QKeySequence.Open,
 									statusTip="Open an existing folder", 
 									triggered=self.openDirectory)
-		self.fileMenu.addAction(self.openAct)
+		self.fileMenu.addAction(self.openDirAct)
 
 		self.instrumentMenu=self.menuBar().addMenu("&Instrument")
 
@@ -386,10 +403,10 @@ class MainWindow(QMainWindow):
 	def showDir(self,dirs):
 		self.Directories=dirs
 		self.asasm=ASASM()	
-		self.Assembly=self.asasm.RetrieveAssemblies(dirs)
+		self.Assemblies=self.asasm.RetrieveAssemblies(dirs)
 
 		self.treeModel=TreeModel(("Name",))
-		self.treeModel.showClasses(self.Assembly)
+		self.treeModel.showClasses(self.Assemblies)
 		self.classTreeView.setModel(self.treeModel)
 		self.classTreeView.connect(self.classTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.classTreeSelected)
 		self.classTreeView.expandAll()
@@ -406,8 +423,8 @@ class MainWindow(QMainWindow):
 		for index in newSelection.indexes():
 			item_data=self.treeModel.getAssocData(index)
 			if item_data!=None:
-				(class_name,refid)=item_data
-				[parsed_lines,methods]=self.Assembly[class_name]
+				(root_dir,class_name,refid)=item_data
+				[parsed_lines,methods]=self.Assemblies[root_dir][class_name]
 				#[blocks,maps,labels,parents,body_parameters]=methods[refid]
 
 				[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
@@ -417,9 +434,9 @@ class MainWindow(QMainWindow):
 		for index in newSelection.indexes():
 				item_data=self.treeModel.getAssocData(index)
 				if item_data!=None:
-					(op,class_name,refid,block_id,block_line_no)=item_data
+					(op,root_dir,class_name,refid,block_id,block_line_no)=item_data
 					
-					[parsed_lines,methods]=self.Assembly[class_name]
+					[parsed_lines,methods]=self.Assemblies[root_dir][class_name]
 					[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
 					self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
 					self.graph.HilightAddress(block_id)

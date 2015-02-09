@@ -233,8 +233,22 @@ class ASASM:
 
 		fd.close()
 
-	def WriteToFiles(self,target_dir,update_code=True):
+	def WriteToFiles(self,target_root_dir='',target_dir='',update_code=True):
 		for root_dir in self.Assemblies.keys():
+			if target_root_dir:
+				target_dir=os.path.join(target_root_dir,os.path.basename(root_dir))
+
+			if self.DebugWriteToFile>0:
+				print 'root_dir:',root_dir
+				print 'target_dir:',target_dir
+				print ''
+
+			if not os.path.isdir(target_dir):
+				try:
+					os.makedirs(target_dir)
+				except:
+					pass
+
 			for (file,(parsed_lines,methods)) in self.Assemblies[root_dir].items():
 				if self.DebugWriteToFile>0:
 					print '* WriteToFiles:', file
@@ -845,15 +859,7 @@ class ASASM:
 		return methods
 
 	DebugInstrument=0
-	def Instrument(self,dir,target_dir,operations=[]):
-		if self.DebugInstrument>0:
-			print '* Parsing', dir
-
-		self.RetrieveAssembly(dir)
-
-		if self.DebugInstrument>0:
-			print '* Parsing complete'
-
+	def Instrument(self,target_root_dir='',target_dir='',operations=[]):
 		[local_names,api_names]=self.GetNames()
 
 		update_code=True
@@ -923,7 +929,7 @@ class ASASM:
 		if self.DebugInstrument>0:
 			print 'Write to files', target_dir
 
-		self.WriteToFiles(target_dir,update_code=update_code)
+		self.WriteToFiles(target_root_dir=target_root_dir,update_code=update_code)
 
 	DebugParse=0
 	def ParseTraitLine(self,line):
@@ -1190,7 +1196,7 @@ class ASASM:
 
 									if not local_names.has_key(qname):
 										local_names[qname]=[]
-									local_names[qname].append([op, refid, block_id, block_line_no])
+									local_names[qname].append([op, root_dir, refid, block_id, block_line_no])
 								else:
 									qname_parts=self.ParseQName(qname)
 									qname=self.AsmQName(qname_parts,remove_ns_arg=True)
@@ -1200,14 +1206,14 @@ class ASASM:
 
 											if not local_names.has_key(qname):
 												local_names[qname]=[]
-											local_names[qname].append([op, class_name, refid, block_id, block_line_no])
+											local_names[qname].append([op, root_dir, class_name, refid, block_id, block_line_no])
 									else:
 										if self.DebugNames>0:
 											print 'API Name:', qname, op, refid, block_id, block_line_no
 									
 										if not api_names.has_key(qname):
 												api_names[qname]=[]
-										api_names[qname].append([op, class_name, refid, block_id, block_line_no])
+										api_names[qname].append([op, root_dir, class_name, refid, block_id, block_line_no])
 
 								ret=self.ParseQName(qname)
 								if len(ret[1])>0:
@@ -1327,8 +1333,11 @@ if __name__=='__main__':
 
 		asasm=ASASM()
 		print asasm.GetName(r'QName(PackageNamespace(""), "class03")')
-		asasm.Instrument('payload-0','payload-0.mod')
-		asasm.Instrument('payload-1','payload-1.mod')
+		asasm.RetrieveAssemblies(['payload-0'])
+		asasm.Instrument(target_dir='payload-0.mod')
+
+		asasm.RetrieveAssemblies(['payload-1'])
+		asasm.Instrument(target_dir='payload-1.mod')
 
 	elif options.dump:
 		asasm=ASASM()
@@ -1342,23 +1351,23 @@ if __name__=='__main__':
 		asasm.DebugMethods=0
 		
 		asasm.RetrieveAssembly(dir)
-		asasm.WriteToFiles(target_dir)
+		asasm.WriteToFiles(target_dir=target_dir)
 
 	elif options.method:
-		asasm=ASASM()
-		asasm.Instrument(dir,target_dir,[["AddMethodTrace",'']])
+		asasm=ASASM(dir)
+		asasm.Instrument(target_dir=target_dir,operations=[["AddMethodTrace",'']])
 
 	elif options.basic_blocks:
-		asasm=ASASM()
-		asasm.Instrument(dir,target_dir,[["AddBasicBlockTrace",'']])
+		asasm=ASASM(dir)
+		asasm.Instrument(target_dir=target_dir,operations=[["AddBasicBlockTrace",'']])
 
 	elif options.api:
-		asasm=ASASM()
-		asasm.Instrument(dir,target_dir,[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
+		asasm=ASASM(dir)
+		asasm.Instrument(target_dir=target_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
 	elif options.include:
-		asasm=ASASM()
-		asasm.Instrument(dir,target_dir,[["Include",["../Util-0/Util.script.asasm"]]])
+		asasm=ASASM(dir)
+		asasm.Instrument(target_dir=target_dir,operations=[["Include",["../Util-0/Util.script.asasm"]]])
 
 	elif options.names:
 		asasm=ASASM()
