@@ -927,7 +927,7 @@ class ASASM:
 							self.Assemblies[root_dir][file][0]=process_lines
 
 		if self.DebugInstrument>0:
-			print 'Write to files', target_dir
+			print 'Write to files:', target_root_dir
 
 		self.WriteToFiles(target_root_dir=target_root_dir,update_code=update_code)
 

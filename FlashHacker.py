@@ -244,8 +244,7 @@ class MainWindow(QMainWindow):
 	def open(self):
 		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
 		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
-		filename = QFileDialog.getOpenFileName(self,
-			"Open SWF", "", "SWF Files (*.swf)")[0]
+		filename = QFileDialog.getOpenFileName(self,"Open SWF","","SWF Files (*.swf)")[0]
 
 		if filename:
 			self.SWFFilename=filename
@@ -293,13 +292,14 @@ class MainWindow(QMainWindow):
 
 		if self.SWFFilename:
 			dir_name=os.path.dirname(self.SWFFilename)
-			base_name='.'.join(os.path.basename(self.SWFFilename).split('.')[0:-1])
+			base_name=os.path.basename(self.SWFFilename)
+			main_name='.'.join(base_name.split('.')[0:-1])
 			i=0
-			target_root_dir=self.SWFFilename+'.mod'
+			target_root_dir=dir_name 
 
 			while True:
-				main_asasm_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.asasm' % (base_name,i,base_name,i)).replace('/','\\')
-				abc_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.abc' % (base_name,i,base_name,i)).replace('/','\\')
+				main_asasm_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.asasm' % (main_name,i,main_name,i)).replace('/','\\')
+				abc_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.abc' % (main_name,i,main_name,i)).replace('/','\\')
 
 				if self.DebugFileOperation>0:
 					print 'main_asasm_file:',main_asasm_file
@@ -318,7 +318,7 @@ class MainWindow(QMainWindow):
 				if self.DebugFileOperation>-1:
 					print output
 
-				swf_outputfilename=os.path.join(target_root_dir,'%s-mod.swf' % base_name).replace('/','\\')
+				swf_outputfilename=os.path.join(target_root_dir,'%s-mod.swf' % main_name).replace('/','\\')
 
 				if self.DebugFileOperation>0:
 					print 'swf_outputfilename:', swf_outputfilename
@@ -340,6 +340,7 @@ class MainWindow(QMainWindow):
 				i+=1
 
 		"""
+		TODO:
 		mkdir Util-0
 		copy Scripts\Util-0\* Util-0\
 		"""
@@ -353,15 +354,15 @@ class MainWindow(QMainWindow):
 			self.showDir([directory])
 
 	def addMethodTrace(self):
-		target_root_dir=self.SWFFilename+'.mod'
+		target_root_dir=os.path.dirname(self.SWFFilename)
 		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddMethodTrace",'']])
 
 	def addBasicBlockTrace(self):
-		target_root_dir=self.SWFFilename+'.mod'
+		target_root_dir=os.path.dirname(self.SWFFilename)
 		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddBasicBlockTrace",'']])
 
 	def addAPITrace(self):
-		target_root_dir=self.SWFFilename+'.mod'
+		target_root_dir=os.path.dirname(self.SWFFilename)
 		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
 	def createMenus(self):
