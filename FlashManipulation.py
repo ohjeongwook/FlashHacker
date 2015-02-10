@@ -8,8 +8,9 @@ from Graphs import *
 import FlowGrapher
 
 class ASASM:
-	def __init__(self):
+	def __init__(self,dir=''):
 		self.Assemblies={}
+		self.RetrieveAssembly(dir)
 
 	def ParseLine(self,line):
 		prefix=''
@@ -944,7 +945,7 @@ class ASASM:
 		if self.DebugInstrument>0:
 			print 'Write to files:', target_root_dir
 
-		self.WriteToFiles(target_root_dir=target_root_dir,update_code=update_code)
+		self.WriteToFiles(target_root_dir=target_root_dir,target_dir=target_dir,update_code=update_code)
 
 	DebugParse=0
 	def ParseTraitLine(self,line):
