@@ -113,7 +113,7 @@ class TreeModel(QAbstractItemModel):
 					item=TreeItem((refid,),dir_item,(root_dir, class_name, refid))
 					dir_item.appendChild(item)
 
-	def showAPIs(self,api_names):
+	def showAPIs(self,api_names,multi_namels):
 		api_names_list=api_names.keys()
 		api_names_list.sort()
 		for api_name in api_names_list:
@@ -122,6 +122,17 @@ class TreeModel(QAbstractItemModel):
 			for [op,root_dir,class_name,refid,block_id,block_line_no] in api_names[api_name]:
 				item=TreeItem((refid,op,),dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
 				dir_item.appendChild(item)
+
+		for multi_namel in multi_namels.keys():
+			added_root=False
+			for [op,root_dir,class_name,refid,block_id,block_line_no] in multi_namels[multi_namel]:
+				if op.startswith('call'):
+					if not added_root:
+						dir_item=TreeItem((multi_namel,"Dynamic"))
+						self.rootItem.appendChild(dir_item)
+						added_root=True
+					item=TreeItem((refid,op,),dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
+					dir_item.appendChild(item)
 
 	def setupModelData(self):
 		pass
@@ -217,10 +228,15 @@ class MainWindow(QMainWindow):
 		vertical_splitter=QSplitter()
 		
 		tab_widget=QTabWidget()
+
 		self.classTreeView=QTreeView()
 		tab_widget.addTab(self.classTreeView,"Classes")
+
 		self.apiTreeView=QTreeView()
 		tab_widget.addTab(self.apiTreeView,"API")
+
+		self.methodTreeView=QTreeView()
+		tab_widget.addTab(self.methodTreeView,"Method trace")
 
 		vertical_splitter.addWidget(tab_widget)
 
@@ -399,6 +415,11 @@ class MainWindow(QMainWindow):
 		target_root_dir=os.path.dirname(self.SWFFilename)
 		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
+	def loadLogTrace(self):
+		filename = QFileDialog.getOpenFileName(self,"Open Log file","","Log Files (*.log)")[0]
+		if filename:
+			pass
+
 	def createMenus(self):
 		self.fileMenu=self.menuBar().addMenu("&File")
 		self.openAct=QAction("&Open SWF file...",
@@ -422,7 +443,6 @@ class MainWindow(QMainWindow):
 									statusTip="Open an existing folder", 
 									triggered=self.openDirectory)
 		self.fileMenu.addAction(self.openDirAct)
-
 		self.instrumentMenu=self.menuBar().addMenu("&Instrument")
 
 		self.addMethodTraceAct=QAction("&Add method traces...",
@@ -440,6 +460,13 @@ class MainWindow(QMainWindow):
 									triggered=self.addAPITrace)
 		self.instrumentMenu.addAction(self.addAPITraceAct)
 
+		self.traceMenu=self.menuBar().addMenu("&Trace")
+
+		self.addLoadLogAct=QAction("&Load log file...",
+									self,
+									triggered=self.loadLogTrace)
+		self.traceMenu.addAction(self.addLoadLogAct)
+
 	def showDir(self,dirs):
 		self.Directories=dirs
 		self.asasm=ASASM()	
@@ -452,9 +479,9 @@ class MainWindow(QMainWindow):
 		self.classTreeView.expandAll()
 		#self.classTreeView.setSelectionMode(QAbstractItemView.MultiSelection)
 
-		[local_names,api_names]=self.asasm.GetNames()
+		[local_names,api_names,multi_names,multi_namels]=self.asasm.GetNames()
 		self.apiTreeModel=TreeModel(("Name",""))
-		self.apiTreeModel.showAPIs(api_names)
+		self.apiTreeModel.showAPIs(api_names,multi_namels)
 		self.apiTreeView.setModel(self.apiTreeModel)
 		self.apiTreeView.connect(self.apiTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.apiTreeSelected)
 		self.apiTreeView.expandAll()

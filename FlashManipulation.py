@@ -876,7 +876,7 @@ class ASASM:
 
 	DebugInstrument=0
 	def Instrument(self,target_root_dir='',target_dir='',operations=[]):
-		[local_names,api_names]=self.GetNames()
+		[local_names,api_names,multi_names,multi_namels]=self.GetNames()
 
 		update_code=True
 		for root_dir in self.Assemblies.keys():
@@ -1187,6 +1187,9 @@ class ASASM:
 
 		local_names={}
 		api_names={}
+		multi_names={}
+		multi_namels={}
+
 		for root_dir in self.Assemblies.keys():
 			for [class_name,[parsed_lines,methods]] in self.Assemblies[root_dir].items():
 				for [refid,[blocks,maps,labels,parents,body_parameters]] in methods.items():
@@ -1245,19 +1248,32 @@ class ASASM:
 										print 'Local arg:', arg
 
 							elif operand.startswith('MultinameL'):
-								if self.DebugNames>0:
+								name=self.ParseArray(operand)[0]
+								if not multi_namels.has_key(name):
+									multi_namels[name]=[]
+								multi_namels[name].append([op, root_dir, class_name, refid, block_id, block_line_no])
+
+								if self.DebugNames>-1:
 									print '*', operand
 									pprint.pprint(self.ParseMultiname(operand))
 									print ''
+
 							elif operand.startswith('Multiname'):
-								if self.DebugNames>0:
+								name=self.ParseArray(operand)[0]
+								if not multi_names.has_key(name):
+									multi_names[name]=[]
+								multi_names[name].append([op, root_dir, class_name, refid, block_id, block_line_no])
+
+								if self.DebugNames>-1:
 									print '*', operand
 									pprint.pprint(self.ParseMultiname(operand))
 									print ''
+
 							elif operand.startswith('TypeName'):
 								if self.DebugNames>0:
 									print '*', operand
 									print ''
+
 							elif operand=='null':
 								pass
 							elif operand[0]=='L':
@@ -1273,7 +1289,40 @@ class ASASM:
 			pprint.pprint(local_names)
 			pprint.pprint(api_names)
 
-		return [local_names,api_names]
+		return [local_names,api_names,multi_names,multi_namels]
+
+	def LoadLogFile(self,log_filename):
+		print 'Opening', log_filename
+		fd=open(log_filename,'r')
+
+		callstack_list=[]
+		methods_callstack=[]
+		while True:
+			line=fd.readline()
+			if not line:
+				break
+			line=line.strip()
+
+			func_name=''
+			if line.startswith('Enter: '):
+				func_name=line[len('Enter: '):]
+				methods_callstack.append(func_name)
+
+				callstack_list.append(methods_callstack)
+
+			elif line.startswith('Return: '):
+				func_name=line[len('Return: '):]
+
+				if len(methods_callstack)>0:
+					for i in range(len(methods_callstack)-1,0,-1):
+						if methods_callstack[i]==func_name:
+							methods_callstack=methods_callstack[0:i-1]
+							break
+
+		for callstack in callstack_list:
+			pass #Find Repetition
+			
+		print len(callstack_list)
 
 if __name__=='__main__':
 	from optparse import OptionParser
@@ -1388,48 +1437,53 @@ if __name__=='__main__':
 	elif options.names:
 		asasm=ASASM()
 		asasm.RetrieveAssemblies(args)
-		[local_names,api_names]=asasm.GetNames()
+		[local_names,api_names,multi_names,multi_namels]=asasm.GetNames()
 		pprint.pprint(local_names)
 		pprint.pprint(api_names)
 
-	if options.test=='Name':
-		asasm=ASASM()
+	if options.test!=None:
+		if options.test.lower()=='name':
+			asasm=ASASM()
 
-		multinames=[]
-		multinames.append("""MultinameL([PrivateNamespace("*", "_a_-_---/class#0"), PackageNamespace(""), PrivateNamespace("*", "_a_-_---/class#1"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), ProtectedNamespace("_a_-_---"), StaticProtectedNs("_a_-_---"), StaticProtectedNs("flash.display:Sprite"), StaticProtectedNs("flash.display:DisplayObjectContainer"), StaticProtectedNs("flash.display:InteractiveObject"), StaticProtectedNs("flash.display:DisplayObject"), StaticProtectedNs("flash.events:EventDispatcher"), StaticProtectedNs("Object")])""")
-		multinames.append(""""Multiname("IFlexAsset", [PackageNamespace("mx.core")])""")
-		multinames.append("""Multiname("Vector", [PrivateNamespace("*", "catch for/instance#0"), PackageNamespace("flash.system"), PackageNamespace("", "#0"), Namespace("http://adobe.com/AS3/2006/builtin"), PrivateNamespace("*", "catch for/instance#1"), PackageInternalNs(""), PackageNamespace("flash.display"), PackageNamespace("flash.events"), PackageNamespace("flash.utils"), ProtectedNamespace("catch for"), StaticProtectedNs("catch for"), StaticProtectedNs("flash.display:MovieClip"), StaticProtectedNs("flash.display:Sprite"), StaticProtectedNs("flash.display:DisplayObjectContainer"), StaticProtectedNs("flash.display:InteractiveObject"), StaticProtectedNs("flash.display:DisplayObject"), StaticProtectedNs("flash.events:EventDispatcher"), PackageNamespace("__AS3__.vec")])""")
-		for multiname in multinames:
-			print '*', multiname
-			ret=asasm.ParseMultiname(multiname)
-			pprint.pprint(ret)
+			multinames=[]
+			multinames.append("""MultinameL([PrivateNamespace("*", "_a_-_---/class#0"), PackageNamespace(""), PrivateNamespace("*", "_a_-_---/class#1"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), ProtectedNamespace("_a_-_---"), StaticProtectedNs("_a_-_---"), StaticProtectedNs("flash.display:Sprite"), StaticProtectedNs("flash.display:DisplayObjectContainer"), StaticProtectedNs("flash.display:InteractiveObject"), StaticProtectedNs("flash.display:DisplayObject"), StaticProtectedNs("flash.events:EventDispatcher"), StaticProtectedNs("Object")])""")
+			multinames.append(""""Multiname("IFlexAsset", [PackageNamespace("mx.core")])""")
+			multinames.append("""Multiname("Vector", [PrivateNamespace("*", "catch for/instance#0"), PackageNamespace("flash.system"), PackageNamespace("", "#0"), Namespace("http://adobe.com/AS3/2006/builtin"), PrivateNamespace("*", "catch for/instance#1"), PackageInternalNs(""), PackageNamespace("flash.display"), PackageNamespace("flash.events"), PackageNamespace("flash.utils"), ProtectedNamespace("catch for"), StaticProtectedNs("catch for"), StaticProtectedNs("flash.display:MovieClip"), StaticProtectedNs("flash.display:Sprite"), StaticProtectedNs("flash.display:DisplayObjectContainer"), StaticProtectedNs("flash.display:InteractiveObject"), StaticProtectedNs("flash.display:DisplayObject"), StaticProtectedNs("flash.events:EventDispatcher"), PackageNamespace("__AS3__.vec")])""")
+			for multiname in multinames:
+				print '*', multiname
+				ret=asasm.ParseMultiname(multiname)
+				pprint.pprint(ret)
+				print ''
+
+			qname="""QName(PrivateNamespace("*", "catch for/instance#0"), "521423832396123423632234")"""
+			print '*',qname
+			pprint.pprint(asasm.ParseQName(qname))
 			print ''
 
-		qname="""QName(PrivateNamespace("*", "catch for/instance#0"), "521423832396123423632234")"""
-		print '*',qname
-		pprint.pprint(asasm.ParseQName(qname))
-		print ''
+			qname='QName(Namespace("http://www.adobe.com/2006/flex/mx/internal"), "VERSION")'
+			print '*',qname
+			pprint.pprint(asasm.ParseArray(qname))
+			print ''
 
-		qname='QName(Namespace("http://www.adobe.com/2006/flex/mx/internal"), "VERSION")'
-		print '*',qname
-		pprint.pprint(asasm.ParseArray(qname))
-		print ''
+			qname='QName(PrivateNamespace("*", "catch for/instance#0"), "52142332316123423632234"), 1'
+			print '*',qname
+			pprint.pprint(asasm.ParseArray(qname))
+			print ''
 
-		qname='QName(PrivateNamespace("*", "catch for/instance#0"), "52142332316123423632234"), 1'
-		print '*',qname
-		pprint.pprint(asasm.ParseArray(qname))
-		print ''
+			qname='QName(PackageNamespace("", "#3"), "_a_-_---")'
+			print '*',qname
+			qname_parts=asasm.ParseQName(qname)
+			pprint.pprint(qname_parts)
+			print asasm.AsmQName(qname_parts,remove_ns_arg=True)
+			print ''
 
-		qname='QName(PackageNamespace("", "#3"), "_a_-_---")'
-		print '*',qname
-		qname_parts=asasm.ParseQName(qname)
-		pprint.pprint(qname_parts)
-		print asasm.AsmQName(qname_parts,remove_ns_arg=True)
-		print ''
+		elif options.test.lower()=="trait":
+			trait="""trait method QName(PrivateNamespace("*", "_a_-_---/class#0"), "_a_--__") flag FINAL dispid 4"""
+			asasm=ASASM()
+			print asasm.ParseTraitLine(trait)
 
-	elif options.test=="Trait":
-		trait="""trait method QName(PrivateNamespace("*", "_a_-_---/class#0"), "_a_--__") flag FINAL dispid 4"""
-		asasm=ASASM()
-		print asasm.ParseTraitLine(trait)
+		elif options.test.lower()=="loadlogfile":
+			asasm=ASASM()
+			asasm.LoadLogFile(args[0])
 
 	
