@@ -71,7 +71,8 @@ class TreeItem(object):
 		try:
 			return self.itemData[column]
 		except:
-			pass
+			import traceback
+			traceback.print_exc()
 
 	def parent(self):
 		return self.parentItem
@@ -319,6 +320,23 @@ class MainWindow(QMainWindow):
 			i=0
 			target_root_dir=dir_name 
 
+			#Copy from Scripts\Util-0 to target_root_dir + Util-0\
+			util0_dir=r"Scripts\Util-0"
+			target_util0_dir=os.path.join(target_root_dir,"Util-0")
+
+			try:
+				if os.path.isdir(target_util0_dir):
+					shutil.rmtree(target_util0_dir)
+			except:
+				import traceback
+				traceback.print_exc()
+
+			try:
+				shutil.copytree(util0_dir,target_util0_dir)
+			except:
+				import traceback
+				traceback.print_exc()
+
 			while True:
 				main_asasm_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.asasm' % (main_name,i,main_name,i)).replace('/','\\')
 				abc_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.abc' % (main_name,i,main_name,i)).replace('/','\\')
@@ -360,12 +378,6 @@ class MainWindow(QMainWindow):
 					print output
 
 				i+=1
-
-		"""
-		TODO:
-		mkdir Util-0
-		copy Scripts\Util-0\* Util-0\
-		"""
 
 	def openDirectory(self):
 		dialog=QFileDialog()
@@ -453,7 +465,6 @@ class MainWindow(QMainWindow):
 			if item_data!=None:
 				(root_dir,class_name,refid)=item_data
 				[parsed_lines,methods]=self.Assemblies[root_dir][class_name]
-				#[blocks,maps,labels,parents,body_parameters]=methods[refid]
 
 				[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
 				self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)

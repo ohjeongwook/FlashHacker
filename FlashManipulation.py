@@ -403,7 +403,7 @@ class ASASM:
 
 		for id in ids:
 			if labels.has_key(id):
-				parsed_lines.append(['',labels[id],'',''])
+				parsed_lines.append(['',labels[id]+':','',''])
 			elif label.has_key(id):
 				parsed_lines.append(['','L%d:' % id,'',''])
 
@@ -514,12 +514,27 @@ class ASASM:
 						pprint.pprint(maps)
 						print ''
 
-					methods[refid]=[blocks,maps,labels,deepcopy(parents),body_parameters]
+					label_map={}
+					for (block_id,label) in labels.items():
+						label_map[label]=block_id
+
+					new_maps={}
+					for [src,dsts] in maps.items():
+						new_maps[src]=[]
+						for dst in dsts:
+							if isinstance(dst, basestring):
+								if new_maps.has_key(src):
+									new_maps[src].append(label_map[dst])
+							else:
+								new_maps[src].append(dst)
+
+					methods[refid]=[blocks,new_maps,labels,deepcopy(parents),body_parameters]
 
 					if self.DebugMethods>0:
 						print '='*80
 						pprint.pprint(blocks)
 						pprint.pprint(maps)
+						pprint.pprint(new_maps)
 						print ''
 
 					blocks={}
@@ -566,7 +581,7 @@ class ASASM:
 						instructions=[]
 						is_last_instruction_jmp=False
 					block_name=instruction_count
-					labels[block_name]=keyword
+					labels[block_name]=keyword[0:-1]
 
 				elif keyword:
 					if len(instructions)==0 and last_block_name!=None and not is_last_instruction_jmp:
@@ -595,9 +610,9 @@ class ASASM:
 									if label[-1]==']':
 										label=label[0:-1]
 
-									jmp_labels.append(int(label[1:]))
+									jmp_labels.append(label)
 							else:
-								jmp_labels.append(int(parameter[1:]))
+								jmp_labels.append(parameter)
 								
 							blocks[block_name]=instructions
 
