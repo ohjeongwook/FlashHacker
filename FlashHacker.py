@@ -242,29 +242,50 @@ class MainWindow(QMainWindow):
 
 	DebugFileOperation=0
 	def open(self):
-		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
-		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
 		filename = QFileDialog.getOpenFileName(self,"Open SWF","","SWF Files (*.swf)")[0]
 
 		if filename:
 			self.SWFFilename=filename
+			self.openSWF(self.SWFFilename)
 
-			if self.DebugFileOperation>0:
-				print subprocess.Popen("%s %s" % (abcexport,filename), shell=True, stdout=subprocess.PIPE).stdout.read()
+	def reload(self):
+		self.openSWF(self.SWFFilename,reload=True)
 
-			dir_name=os.path.dirname(filename)
-			base_filename='.'.join(os.path.basename(filename).split('.')[0:-1])
+	def openSWF(self,filename,reload=False):
+		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
+		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
 
-			i=0
-			abc_dirnames=[]
-			while True:
-				abc_filename=os.path.join(dir_name,'%s-%d.abc' % (base_filename,i))
-				abc_filename=abc_filename.replace('/','\\')
+		cmdline="%s %s" % (abcexport,filename)
 
-				if os.path.isfile(abc_filename):
-					if self.DebugFileOperation>0:
-						print 'abc_filename:', abc_filename
-					output=subprocess.Popen("%s %s" % (rabcdasm,abc_filename), shell=True, stdout=subprocess.PIPE).stdout.read()
+		if self.DebugFileOperation>-1:
+			print '* Executing: %s' % cmdline
+
+		ouput=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
+		if self.DebugFileOperation>-1:
+			print ouput
+
+		dir_name=os.path.dirname(filename)
+		base_filename='.'.join(os.path.basename(filename).split('.')[0:-1])
+
+		i=0
+		abc_dirnames=[]
+		while True:
+			abc_filename=os.path.join(dir_name,'%s-%d.abc' % (base_filename,i)).replace('/','\\')
+			abc_dirname=os.path.join(dir_name,'%s-%d' % (base_filename,i)).replace('/','\\')
+
+			if os.path.isfile(abc_filename):
+				if self.DebugFileOperation>0:
+					print 'abc_filename:', abc_filename
+
+				if reload and os.path.isdir(abc_dirname):
+					shutil.rmtree(abc_dirname)
+
+				if not os.path.isdir(abc_dirname):
+					cmdline="%s %s" % (rabcdasm,abc_filename)
+					if self.DebugFileOperation>-1:
+						print '* Executing: %s' % cmdline
+
+					output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
 
 					if self.DebugFileOperation>0:
 						print output
@@ -273,15 +294,16 @@ class MainWindow(QMainWindow):
 
 					if self.DebugFileOperation>0:
 						print 'abc_dirname:', abc_dirname
-					if os.path.isdir(abc_dirname):
-						if self.DebugFileOperation>0:
-							print 'Disasm succeeded', abc_dirname
-						abc_dirnames.append(abc_dirname)
-				else:
-					break
-				i+=1
 
-			self.showDir(abc_dirnames)
+				if os.path.isdir(abc_dirname):
+					if self.DebugFileOperation>0:
+						print 'Disasm succeeded', abc_dirname
+					abc_dirnames.append(abc_dirname)
+			else:
+				break
+			i+=1
+
+		self.showDir(abc_dirnames)
 
 	def save(self):
 		rabcasm=os.path.join(self.RABCDAsmPath,"rabcasm.exe")
@@ -371,6 +393,11 @@ class MainWindow(QMainWindow):
 									self,
 									triggered=self.open)
 		self.fileMenu.addAction(self.openAct)
+
+		self.reloadAct=QAction("&Reload...",
+									self,
+									triggered=self.reload)
+		self.fileMenu.addAction(self.reloadAct)
 
 		self.saveAct=QAction("&Save...",
 									self,

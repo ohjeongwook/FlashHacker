@@ -846,7 +846,7 @@ class ASASM:
 								new_blocks.append(['pushstring','"%s"' % refid])
 								new_blocks.append(['pushstring','"%s %s"' % (keyword,escaped_parameter)])
 								new_blocks.append(['getlocal','%d' % array_reg])
-								new_blocks.append(['callpropvoid','QName(PackageNamespace(""), "DumpArray"), 4'])
+								new_blocks.append(['callpropvoid','QName(PackageNamespace(""), "DumpAPI"), 4'])
 
 								for i in range(0,stack_count,1):
 									new_blocks.append(['getlocal','%d' % (current_local_count-1-i) ])

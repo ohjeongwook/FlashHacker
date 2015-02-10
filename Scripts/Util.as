@@ -15,9 +15,9 @@ package
 			test.push(car);
 		}
 
-		public static function DumpArray(filename:String, refid:String, instruction:String, array:Array):void
+		public static function DumpAPI(filename:String, refid:String, instruction:String, array:Array):void
 		{
-			trace("*** DumpArray");
+			trace("*** DumpAPI");
 			trace(filename);
 			trace(refid);
 			trace(instruction);

@@ -69,9 +69,9 @@ class
    end ; code
   end ; body
  end ; method
- trait method QName(PackageNamespace(""), "DumpArray") flag FINAL dispid 3
+ trait method QName(PackageNamespace(""), "DumpAPI") flag FINAL dispid 3
   method
-   refid "Util/class/DumpArray"
+   refid "Util/class/DumpAPI"
    param QName(PackageNamespace(""), "String")
    param QName(PackageNamespace(""), "String")
    param QName(PackageNamespace(""), "String")
@@ -87,7 +87,7 @@ class
      pushscope
 
      findpropstrict      QName(PackageNamespace(""), "trace")
-     pushstring          "*** DumpArray"
+     pushstring          "*** DumpAPI"
      callpropvoid        QName(PackageNamespace(""), "trace"), 1
 
      findpropstrict      QName(PackageNamespace(""), "trace")
@@ -112,7 +112,7 @@ L17:
      findpropstrict      QName(PackageNamespace(""), "trace")
      getlocal            4
      getlocal            5
-     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PrivateNamespace(null, "Util/class/DumpArray"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.utils"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.utils"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
      callpropvoid        QName(PackageNamespace(""), "trace"), 1
 
      inclocal_i          5
