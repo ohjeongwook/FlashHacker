@@ -167,7 +167,7 @@ class ASASM:
 				line+=" "+parameter
 
 			if comment:
-				line+=" ; "+comment
+				line+=" ;"+comment
 			line+='\n'
 			fd.write(line)
 
@@ -409,7 +409,9 @@ class ASASM:
 				parsed_lines.append(['','L%d:' % id,'',''])
 
 			for (keyword,parameter) in blocks[id]:
-				parsed_lines.append(['      ',keyword,parameter,''])
+				if parameter:
+					parameter=' '*(19-len(keyword)) + parameter
+				parsed_lines.append([' '*5,keyword,parameter,''])
 
 		return parsed_lines
 
@@ -677,7 +679,7 @@ class ASASM:
 		return asasm_files
 
 	DebugMethodTrace=0
-	def AddMethodTrace(self,parsed_lines):
+	def AddMethodTrace1(self,parsed_lines):
 		if self.DebugMethodTrace>0:
 			print '='*80
 			print '* AddMethodTrace:'
@@ -748,7 +750,7 @@ class ASASM:
 		return new_parsed_lines
 
 	DebugBasicBlockTrace=0
-	def AddBasicBlockTrace(self,methods,filename=''):
+	def AddBasicBlockTrace(self,methods,type='block',filename=''):
 		for refid in methods.keys():
 			(blocks,maps,labels,parents,body_parameters)=methods[refid]
 			for block_id in blocks.keys():
@@ -762,12 +764,39 @@ class ASASM:
 				if self.DebugBasicBlockTrace >0:
 					print 'Instrumenting',refid,parents
 
-				if parents[-3][0]=='method' and labels.has_key(block_id) and blocks[block_id][0][0]!='label':
-					trace_code=[]
-					trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
-					trace_code.append(['pushstring','"%s\t%s\t%s"' % (filename,refid,labels[block_id])])
-					trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
-					blocks[block_id][0:0]=trace_code
+				if type=='block':
+					if parents[-3][0]=='method' and labels.has_key(block_id) and blocks[block_id][0][0]!='label':
+						trace_code=[]
+						trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+						if labels.has_key(block_id):
+							message=labels[block_id]
+						else:
+							message='enter function'
+
+						trace_code.append(['pushstring','"    Label: %s"' % (message)])
+						trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
+						blocks[block_id][0:0]=trace_code
+				
+				if parents[-3][0]=='method':
+					if block_id==0:
+						trace_code=[]
+						trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+						trace_code.append(['pushstring','"Enter: %s\t%s"' % (filename,refid)])
+						trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
+						blocks[block_id][0:0]=trace_code
+
+					new_block=[]
+					for [op,operand] in blocks[block_id]:
+						if op.startswith('return'):
+							new_block.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+							new_block.append(['pushstring','"Return: %s\t%s"' % (filename,refid)])
+							new_block.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
+						new_block.append([op,operand])
+
+					if len(new_block)>0:
+						blocks[block_id]=new_block
+
+					body_parameters=self.AdjustParameter(body_parameters,'maxstack',5)
 
 			methods[refid]=(blocks,maps,labels,parents,body_parameters)
 		return methods
@@ -789,8 +818,21 @@ class ASASM:
 		body_parameters[key]=str(int(body_parameters[key])+value)
 		return body_parameters
 
-	def AddAPITrace(self,methods,filename='',api_names={}):
+	def HasPattern(self,patterns,parameter):
+		if len(patterns)==0:
+			return True
+
+		for pattern in patterns:
+			if parameter.find(pattern)>=0:
+				return True
+
+		return False
+
+	def AddAPITrace(self,methods,filename='',target_refids=[],api_names={},patterns=[]):
 		for refid in methods.keys():
+			if len(target_refids)>0 and not refid in target_refids:
+				continue
+
 			(blocks,maps,labels,parents,body_parameters)=methods[refid]
 			for block_id in blocks.keys():
 				if self.DebugAddAPITrace>1:
@@ -807,7 +849,7 @@ class ASASM:
 					max_stack_count=0
 
 					for (keyword,parameter) in blocks[block_id]:
-						if keyword[0:4]=='call' and api_names.has_key(self.ParseArray(parameter)[0]):
+						if keyword[0:4]=='call' and (api_names.has_key(self.ParseArray(parameter)[0]) or parameter.startswith('Multiname')) and self.HasPattern(patterns,parameter):
 							stack_count=self.GetCallStackCount(keyword,parameter)
 							if self.DebugAddAPITrace >0:
 								print '* ',type,refid
@@ -832,7 +874,7 @@ class ASASM:
 
 					new_blocks=[]
 					for (keyword,parameter) in blocks[block_id]:
-						if keyword[0:4]=='call' and api_names.has_key(self.ParseArray(parameter)[0]):
+						if keyword[0:4]=='call' and (api_names.has_key(self.ParseArray(parameter)[0]) or parameter.startswith('Multiname')) and self.HasPattern(patterns,parameter):
 							escaped_parameter=parameter.replace('"','\\"')
 
 							stack_count=self.GetCallStackCount(keyword,parameter)
@@ -874,22 +916,21 @@ class ASASM:
 			methods[refid]=(blocks,maps,labels,parents,body_parameters)
 		return methods
 
-	DebugInstrument=0
-	def Instrument(self,target_root_dir='',target_dir='',operations=[]):
+	DebugInstrument=1
+	def Instrument(self,operations=[],target_refids=[]):
 		[local_names,api_names,multi_names,multi_namels]=self.GetNames()
 
-		update_code=True
 		for root_dir in self.Assemblies.keys():
 			for file in self.Assemblies[root_dir].keys():
 				for (operation,options) in operations:
-					if self.DebugInstrument >0:
-						print '* Instrumenting', file, operation,options
+					if self.DebugInstrument>-1:
+						print '* Instrumenting', file, operation, options
 
 					if operation=="AddBasicBlockTrace":
-						self.Assemblies[root_dir][file][1]=self.AddBasicBlockTrace(self.Assemblies[root_dir][file][1],filename=file)
+						self.Assemblies[root_dir][file][1]=self.AddBasicBlockTrace(self.Assemblies[root_dir][file][1],target_refids=target_refids,filename=file)
 
 					if operation=="AddAPITrace":
-						self.Assemblies[root_dir][file][1]=self.AddAPITrace(self.Assemblies[root_dir][file][1],filename=file,api_names=api_names)
+						self.Assemblies[root_dir][file][1]=self.AddAPITrace(self.Assemblies[root_dir][file][1],filename=file,target_refids=target_refids,api_names=api_names,patterns=options)
 
 					if operation=="Replace":
 						for [orig,replace] in options:
@@ -901,25 +942,7 @@ class ASASM:
 							"""
 
 					if operation=="AddMethodTrace":
-						if self.DebugInstrument>0:
-							print 'Calling AddMethodTrace'
-						self.Assemblies[root_dir][file][0]=self.AddMethodTrace(self.Assemblies[root_dir][file][0])
-
-						if self.DebugInstrument>0:
-							print 'Calling AdjustParameter'
-
-						for refid in self.Assemblies[root_dir][file][1].keys():
-							self.Assemblies[root_dir][file][1][refid][4]=self.AdjustParameter(self.Assemblies[root_dir][file][1][refid][4],'maxstack',5)
-
-						if self.DebugInstrument>1:
-							print '='*80
-							pprint.pprint(self.Assemblies[root_dir][file][0])
-							print ''
-
-						if self.DebugInstrument>0:
-							print 'AddMethodTrace complete'
-
-						update_code=False
+						self.Assemblies[root_dir][file][1]=self.AddBasicBlockTrace(self.Assemblies[root_dir][file][1],type='function',filename=file)
 
 					if operation=="Include":
 						if file[-1*len('.main.asasm'):]=='.main.asasm':
@@ -942,10 +965,14 @@ class ASASM:
 
 							self.Assemblies[root_dir][file][0]=process_lines
 
-		if self.DebugInstrument>0:
-			print 'Write to files:', target_root_dir
-
-		self.WriteToFiles(target_root_dir=target_root_dir,target_dir=target_dir,update_code=update_code)
+	def Save(self,target_root_dir='',target_dir=''):
+		if target_root_dir or target_dir:
+			if self.DebugInstrument>0:
+				if target_root_dir:
+					print 'Write to files:', target_root_dir
+				else:
+					print 'Write to files:', target_dir
+			self.WriteToFiles(target_root_dir=target_root_dir,target_dir=target_dir)
 
 	DebugParse=0
 	def ParseTraitLine(self,line):
@@ -1253,7 +1280,7 @@ class ASASM:
 									multi_namels[name]=[]
 								multi_namels[name].append([op, root_dir, class_name, refid, block_id, block_line_no])
 
-								if self.DebugNames>-1:
+								if self.DebugNames>0:
 									print '*', operand
 									pprint.pprint(self.ParseMultiname(operand))
 									print ''
@@ -1264,7 +1291,7 @@ class ASASM:
 									multi_names[name]=[]
 								multi_names[name].append([op, root_dir, class_name, refid, block_id, block_line_no])
 
-								if self.DebugNames>-1:
+								if self.DebugNames>0:
 									print '*', operand
 									pprint.pprint(self.ParseMultiname(operand))
 									print ''
@@ -1354,95 +1381,79 @@ if __name__=='__main__':
 			[disasms,links,address2name]=asasm.ConvertMapsToPrintable(assemblies[file][1][method])
 			self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
 
-
 	parser=OptionParser()
 	parser.add_option("-g","--graph",dest="graph",action="store_true",default=False)
 	parser.add_option("-r","--replace",dest="replace",action="store_true",default=False)
-	parser.add_option("-c","--reconstruct",dest="reconstruct",action="store_true",default=False)
-	parser.add_option("-d","--dump",dest="dump",action="store_true",default=False)
+	parser.add_option("-D","--dump",dest="dump",action="store_true",default=False)
 	parser.add_option("-m","--method",dest="method",action="store_true",default=False)
 	parser.add_option("-b","--basic_blocks",dest="basic_blocks",action="store_true",default=False)
 	parser.add_option("-a","--api",dest="api",action="store_true",default=False)
-	parser.add_option("-i","--include",dest="include",action="store_true",default=False)
-	parser.add_option("-n","--names",dest="names",action="store_true",default=False)
-	parser.add_option("-t", "--test", dest="test",help="Perform basic tests", metavar="TEST")
+	parser.add_option("-T","--test",dest="test",help="Perform basic tests",default='',metavar="TEST")
+	parser.add_option("-d","--asasm_dir",dest="asasm_dir",help="",default='',metavar="ASASM_DIR")
+	parser.add_option("-t","--target_dir",dest="target_dir",help="",default='',metavar="ASASM_SAVE_DIR")
+
 	(options,args)=parser.parse_args()
-
-	dir=''
-	target_dir=''
-	if len(args)>0:
-		dir=args[0]
-		if len(args)>1:
-			target_dir=args[1]
-
 	if options.graph:
 		app=QApplication(sys.argv)
 		frame=MainWindow()
-		frame.Draw(dir)
+		frame.Draw(options.asasm_dir)
 		frame.setGeometry(100,100,800,500)
 		frame.show()
 		sys.exit(app.exec_())
 
-	elif options.replace:
-		replace_patterns=[]
+	else:
+		asasm=ASASM(options.asasm_dir)
 
-		replace_patterns.append(["_a_--__-","class02"])
-		replace_patterns.append(["_a_-_---","class04"])
-		replace_patterns.append(["_a_-_-__","class06"])
-		replace_patterns.append(["_a_---","class01"])
-		replace_patterns.append(["_a_-_-_","class05"])
-		replace_patterns.append(["_a_-_","class03"])
+		if options.dump:
+			pprint.pprint(asasm.Assemblies)
 
-		new_folder=r"..\payload-0.mod"
+		if options.replace:
+			replace_patterns=[]
 
+			replace_patterns.append(["_a_--__-","class02"])
+			replace_patterns.append(["_a_-_---","class04"])
+			replace_patterns.append(["_a_-_-__","class06"])
+			replace_patterns.append(["_a_---","class01"])
+			replace_patterns.append(["_a_-_-_","class05"])
+			replace_patterns.append(["_a_-_","class03"])
 
-		asasm=ASASM()
-		print asasm.GetName(r'QName(PackageNamespace(""), "class03")')
-		asasm.RetrieveAssemblies(['payload-0'])
-		asasm.Instrument(target_dir='payload-0.mod')
-
-		asasm.RetrieveAssemblies(['payload-1'])
-		asasm.Instrument(target_dir='payload-1.mod')
-
-	elif options.dump:
-		asasm=ASASM()
-		asasm.DebugMethods=0
-		assemblies=asasm.RetrieveAssembly(dir)
-		pprint.pprint(assemblies)
-		#asasm.RetrieveFile(os.path.join(dir,'.\\_a_-_-_.class.asasm'))
-
-	elif options.reconstruct:
-		asasm=ASASM()
-		asasm.DebugMethods=0
+			new_folder=r"..\payload-0.mod"
 		
-		asasm.RetrieveAssembly(dir)
-		asasm.WriteToFiles(target_dir=target_dir)
+			print asasm.GetName(r'QName(PackageNamespace(""), "class03")')
+			asasm.RetrieveAssemblies(['payload-0'])
+			asasm.Instrument()
 
-	elif options.method:
-		asasm=ASASM(dir)
-		asasm.Instrument(target_dir=target_dir,operations=[["AddMethodTrace",'']])
+			asasm.RetrieveAssemblies(['payload-1'])
+			asasm.Instrument()
 
-	elif options.basic_blocks:
-		asasm=ASASM(dir)
-		asasm.Instrument(target_dir=target_dir,operations=[["AddBasicBlockTrace",'']])
+		if options.api:
+			asasm.Instrument(operations=[["AddAPITrace",['MultinameL']], ["Include",["../Util-0/Util.script.asasm"]]], target_refids=args)
 
-	elif options.api:
-		asasm=ASASM(dir)
-		asasm.Instrument(target_dir=target_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
+		if options.method:
+			asasm.Instrument(operations=[["AddMethodTrace",'']])
 
-	elif options.include:
-		asasm=ASASM(dir)
-		asasm.Instrument(target_dir=target_dir,operations=[["Include",["../Util-0/Util.script.asasm"]]])
+		if options.basic_blocks:
+			asasm.Instrument(operations=[["AddBasicBlockTrace",'']])
 
-	elif options.names:
-		asasm=ASASM()
-		asasm.RetrieveAssemblies(args)
-		[local_names,api_names,multi_names,multi_namels]=asasm.GetNames()
-		pprint.pprint(local_names)
-		pprint.pprint(api_names)
+		if options.target_dir:
+			asasm.Save(target_dir=options.target_dir)
 
 	if options.test!=None:
-		if options.test.lower()=='name':
+		if options.test.lower()=='names':
+			asasm=ASASM(options.target_dir)
+			[local_names,api_names,multi_names,multi_namels]=asasm.GetNames()
+			pprint.pprint(local_names)
+			pprint.pprint(api_names)
+
+		elif options.test.lower()=='include':
+			asasm=ASASM(options.target_dir)
+			asasm.Instrument(operations=[["Include",["../Util-0/Util.script.asasm"]]])
+
+		elif options.test.lower()=='reconstruct':
+			asasm.DebugMethods=0
+			asasm.WriteToFiles()
+
+		elif options.test.lower()=='name':
 			asasm=ASASM()
 
 			multinames=[]
