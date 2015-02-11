@@ -78,49 +78,98 @@ class
    param QName(PackageNamespace(""), "Array")
    returns QName(PackageNamespace(""), "void")
    body
-    maxstack 3
-    localcount 6
+    maxstack 4
+    localcount 7
     initscopedepth 3
     maxscopedepth 4
     code
      getlocal0
      pushscope
 
-     findpropstrict      QName(PackageNamespace(""), "trace")
-     pushstring          "*** DumpAPI"
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+     pushnull
+     coerce_s
+     setlocal            6
 
      findpropstrict      QName(PackageNamespace(""), "trace")
-     getlocal1
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
-
-     findpropstrict      QName(PackageNamespace(""), "trace")
-     getlocal2
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
-
-     findpropstrict      QName(PackageNamespace(""), "trace")
+     pushstring          "        API:"
      getlocal3
+     add
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     pushstring          "            From: "
+     getlocal1
+     add
+     pushstring          "\x09"
+     add
+     getlocal2
+     add
      callpropvoid        QName(PackageNamespace(""), "trace"), 1
 
      pushbyte            0
      setlocal            5
 
-     jump                L24
+     jump                L63
 
-L17:
+L22:
      label
+     findpropstrict      QName(PackageNamespace("flash.utils"), "getQualifiedClassName")
+     getlocal            4
+     getlocal            5
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     callproperty        QName(PackageNamespace("flash.utils"), "getQualifiedClassName"), 1
+     coerce_s
+     setlocal            6
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     pushstring          "* "
+     getlocal            6
+     add
+     pushstring          ":"
+     add
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     getlocal            6
+     pushstring          "String"
+     ifne                L46
+
      findpropstrict      QName(PackageNamespace(""), "trace")
      getlocal            4
      getlocal            5
-     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.utils"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
      callpropvoid        QName(PackageNamespace(""), "trace"), 1
 
+     jump                L62
+
+L46:
+     getlocal            6
+     pushstring          "flash.utils::ByteArray"
+     ifne                L57
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     findpropstrict      QName(PackageNamespace(""), "DumpByteArray")
+     getlocal            4
+     getlocal            5
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     callproperty        QName(PackageNamespace(""), "DumpByteArray"), 1
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     jump                L62
+
+L57:
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     getlocal            4
+     getlocal            5
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+L62:
      inclocal_i          5
-L24:
+L63:
      getlocal            5
      getlocal            4
      getproperty         QName(PackageNamespace(""), "length")
-     iflt                L17
+     iflt                L22
 
      findpropstrict      QName(PackageNamespace(""), "trace")
      pushstring          ""
@@ -138,7 +187,7 @@ L24:
    returns QName(PackageNamespace(""), "String")
    body
     maxstack 5
-    localcount 11
+    localcount 10
     initscopedepth 3
     maxscopedepth 4
     code
@@ -146,17 +195,17 @@ L24:
      pushscope
 
      pushbyte            0
-     setlocal            7
+     setlocal            6
 
      pushnull
      coerce_s
+     setlocal            7
+
+     pushbyte            0
      setlocal            8
 
      pushbyte            0
      setlocal            9
-
-     pushbyte            0
-     setlocal            10
 
      findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
      pushstring          "Offset"
@@ -175,21 +224,18 @@ L24:
      convert_i
      setlocal            4
 
-     pushstring          ""
-     setlocal            5
-
      getlocal1
      pushbyte            0
      setproperty         QName(PackageNamespace(""), "position")
 
      pushbyte            0
-     setlocal            6
+     setlocal            5
 
-     jump                L128
+     jump                L122
 
-L33:
+L31:
      label
-     getlocal            5
+     getlocal2
      findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
      getlocal3
      pushbyte            16
@@ -202,7 +248,7 @@ L33:
      add
      add
      coerce_s
-     setlocal            5
+     setlocal2
 
      getlex              QName(PackageNamespace(""), "Math")
      pushbyte            16
@@ -213,50 +259,50 @@ L33:
      subtract
      callproperty        QName(PackageNamespace(""), "min"), 2
      convert_i
-     setlocal            7
+     setlocal            6
 
      pushstring          ""
-     setlocal            8
+     setlocal            7
 
      pushbyte            0
-     setlocal            9
+     setlocal            8
 
-     jump                L111
+     jump                L105
 
-L63:
+L61:
      label
-     getlocal            9
-     getlocal            7
-     ifnlt               L102
+     getlocal            8
+     getlocal            6
+     ifnlt               L100
 
      getlocal1
      callproperty        QName(PackageNamespace(""), "readUnsignedByte"), 0
      convert_i
-     setlocal            10
+     setlocal            9
 
-     getlocal            8
-     getlocal            10
+     getlocal            7
+     getlocal            9
      pushbyte            32
      greaterequals
-     iffalse             L81
+     iffalse             L79
 
      getlex              QName(PackageNamespace(""), "String")
-     getlocal            10
+     getlocal            9
      callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "fromCharCode"), 1
      coerce_a
-     jump                L83
+     jump                L81
 
-L81:
+L79:
      pushstring          "."
      coerce_a
-L83:
+L81:
      add
      coerce_s
-     setlocal            8
+     setlocal            7
 
-     getlocal            5
+     getlocal2
      findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
-     getlocal            10
+     getlocal            9
      pushbyte            16
      callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "toString"), 1
      callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "toUpperCase"), 0
@@ -267,55 +313,44 @@ L83:
      add
      add
      coerce_s
-     setlocal            5
+     setlocal2
 
      inclocal_i          3
-     jump                L110
+     jump                L104
 
-L102:
-     getlocal            5
-     pushstring          "\x09"
+L100:
+     getlocal2
+     pushstring          "   "
      add
-     setlocal            5
+     setlocal2
 
+L104:
+     inclocal_i          8
+L105:
      getlocal            8
-     pushstring          " "
-     add
-     setlocal            8
-
-L110:
-     inclocal_i          9
-L111:
-     getlocal            9
      pushbyte            16
-     iflt                L63
+     iflt                L61
 
-     getlocal            5
+     getlocal2
      pushstring          " "
-     getlocal            8
+     getlocal            7
      add
      pushstring          "\n"
      add
      add
      coerce_s
-     setlocal            5
+     setlocal2
 
-     getlocal            6
-     pushbyte            15
+     getlocal            5
+     pushbyte            16
      add
      convert_i
-     setlocal            6
+     setlocal            5
 
-L128:
-     getlocal            6
-     getlocal            4
-     iflt                L33
-
-     getlocal2
+L122:
      getlocal            5
-     add
-     coerce_s
-     setlocal2
+     getlocal            4
+     iflt                L31
 
      getlocal2
      returnvalue
