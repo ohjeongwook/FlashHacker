@@ -134,6 +134,64 @@ class TreeModel(QAbstractItemModel):
 					item=TreeItem((refid,op,),dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
 					dir_item.appendChild(item)
 
+	DebugShowTrace=0
+	def showTrace(self,repeat_info_list):
+		last_call_stack=[]
+		node_map={}
+
+		for repeat_info in repeat_info_list:
+			if self.DebugShowTrace>0:
+				print 'New Repeat Info:'
+
+			index=0
+			for call_stack in repeat_info['callstack']:
+				if self.DebugShowTrace>0:
+					for call_stack_line in call_stack:
+						print '\t',call_stack_line
+
+				new_node_map={}
+				last_root_item=self.rootItem
+				for i in range(0,len(call_stack),1):
+					if self.DebugShowTrace>0:
+						print '\tAdding:',call_stack[i], '\tKey:',call_stack[0:i+1]
+
+					node_key=str(call_stack[0:i+1])
+
+					if node_map.has_key(node_key):
+						last_root_item=node_map[node_key]
+					else:
+						if index==0 and i==len(call_stack)-1:
+							repeated_str=str(repeat_info['repeated'])
+						else:
+							repeated_str=''
+
+						new_item=TreeItem((call_stack[i],repeated_str),last_root_item)
+
+						node_map[node_key]=new_item
+						last_root_item.appendChild(new_item)
+						last_root_item=new_item
+
+					new_node_map[node_key]=last_root_item
+
+				node_map=new_node_map
+
+				j=0
+				while j<min(len(call_stack),len(last_call_stack)):
+					if call_stack[j]!=last_call_stack[j]:
+						break
+					j+=1
+				if self.DebugShowTrace>0:
+					print '\tCommon stack list:',j,call_stack[0:j]
+					print ''
+
+				last_call_stack=call_stack
+
+				index+=1
+
+			if self.DebugShowTrace>0:						
+				print '\t',repeat_info['repeated']
+				print ''
+
 	def setupModelData(self):
 		pass
 
@@ -235,8 +293,8 @@ class MainWindow(QMainWindow):
 		self.apiTreeView=QTreeView()
 		tab_widget.addTab(self.apiTreeView,"API")
 
-		self.methodTreeView=QTreeView()
-		tab_widget.addTab(self.methodTreeView,"Method trace")
+		self.traceTreeView=QTreeView()
+		tab_widget.addTab(self.traceTreeView,"Method trace")
 
 		vertical_splitter.addWidget(tab_widget)
 
@@ -416,9 +474,17 @@ class MainWindow(QMainWindow):
 		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
 	def loadLogTrace(self):
-		filename = QFileDialog.getOpenFileName(self,"Open Log file","","Log Files (*.log)")[0]
+		filename = QFileDialog.getOpenFileName(self,"Open Log file","","Log Files (*.txt)")[0]
 		if filename:
-			pass
+			print filename
+			repeat_info_list=self.asasm.LoadLogFile(filename)
+
+			[local_names,api_names,multi_names,multi_namels]=self.asasm.GetNames()
+			self.traceTreeModel=TreeModel(("Stack","Count"))
+			self.traceTreeModel.showTrace(repeat_info_list)
+			self.traceTreeView.setModel(self.traceTreeModel)
+			#self.traceTreeView.connect(self.traceTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.apiTreeSelected)
+			self.traceTreeView.expandAll()
 
 	def createMenus(self):
 		self.fileMenu=self.menuBar().addMenu("&File")

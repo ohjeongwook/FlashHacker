@@ -1318,8 +1318,11 @@ class ASASM:
 
 		return [local_names,api_names,multi_names,multi_namels]
 
+	DebugLoadLogFile=0
 	def LoadLogFile(self,log_filename):
-		print 'Opening', log_filename
+		if self.DebugLoadLogFile>0:
+			print 'Opening', log_filename
+
 		fd=open(log_filename,'r')
 
 		callstack_list=[]
@@ -1334,22 +1337,120 @@ class ASASM:
 			if line.startswith('Enter: '):
 				func_name=line[len('Enter: '):]
 				methods_callstack.append(func_name)
-
-				callstack_list.append(methods_callstack)
+				callstack_list.append(deepcopy(methods_callstack))
+				if self.DebugLoadLogFile>0:
+					print 'Enter ', func_name
+					print '\t',methods_callstack
 
 			elif line.startswith('Return: '):
 				func_name=line[len('Return: '):]
 
 				if len(methods_callstack)>0:
-					for i in range(len(methods_callstack)-1,0,-1):
+					for i in range(len(methods_callstack)-1,-1,-1):
 						if methods_callstack[i]==func_name:
-							methods_callstack=methods_callstack[0:i-1]
+							if i!=len(methods_callstack)-1:
+								print 'Skip Return', methods_callstack
+
+							if self.DebugLoadLogFile>0:
+								print 'Return', func_name
+								print '\t',methods_callstack
+
+							methods_callstack=methods_callstack[0:i]
+
+							if self.DebugLoadLogFile>0:
+								print '\t',methods_callstack
 							break
 
-		for callstack in callstack_list:
-			pass #Find Repetition
-			
-		print len(callstack_list)
+		if self.DebugLoadLogFile>0:
+			pprint.pprint(callstack_list)
+
+		non_repetition_start=0
+		last_repeated_n=0
+		repeat_info={}
+		repeat_info_list=[]
+		for i in range(1,len(callstack_list)+1,1):
+			if self.DebugLoadLogFile>0:
+				print ''
+				print 'Line:',i-1,callstack_list[i-1]
+
+			found_repetition=False
+			for n in range(1,4,1):
+				if self.DebugLoadLogFile>1:
+					print '\tComparing:'
+					print '\t\t %d-%d %s' % (i-n*2, i-n, str(callstack_list[i-n*2:i-n]))
+					print '\t\t %d-%d %s' % (i-n, i, str(callstack_list[i-n:i]))
+
+				if str(callstack_list[i-n*2:i-n])==str(callstack_list[i-n:i]):
+					if last_repeated_n==n:
+						repeat_info['repeated']+=1
+
+						if self.DebugLoadLogFile>0:
+							print '\t+Repetition continuation %d repeated' % (repeat_info['repeated'])
+
+					else:
+						if self.DebugLoadLogFile>0:
+							print '\t> New repetition started: (%d:%d == %d:%d) %s' % (i-n*2,i-n, i-n,i, callstack_list[i-n:i])
+							print '\t> Save non-repetitions (%d-%d)' % (non_repetition_start,i-n*2)
+							print '\t\t', pprint.pformat(callstack_list[non_repetition_start:i-n*2])
+
+						repeat_info_list.append({'callstack': callstack_list[non_repetition_start:i-n*2], 'repeated': 1})
+
+						repeat_info['callstack']=callstack_list[i-n:i]
+						repeat_info['repeated']=2
+
+						if self.DebugLoadLogFile>0:
+							print '\t> New repeat_info:',repeat_info['callstack'], "repeated\t", repeat_info['repeated']
+
+					found_repetition=True
+					last_repeated_n=n
+					break
+
+			if not found_repetition:
+				if len(repeat_info):
+					if self.DebugLoadLogFile>0:
+						print '\t> Save repetition:',repeat_info['callstack'], "repeated\t", repeat_info['repeated']
+
+					repeat_info_list.append(deepcopy(repeat_info))
+					repeat_info={}
+				
+					non_repetition_start=i-1
+
+					if self.DebugLoadLogFile>0:
+						print '\t> New non-repetition starts:',non_repetition_start
+
+				last_repeated_n=0
+		
+		if self.DebugLoadLogFile>0:
+			print repeat_info['callstack'], "repeated\t", repeat_info['repeated']
+
+		repeat_info_list.append(deepcopy(repeat_info))
+
+		if self.DebugLoadLogFile>0:
+			pprint.pprint(repeat_info_list)
+
+		if self.DebugLoadLogFile>0:
+			last_call_stack=[]
+			for repeat_info in repeat_info_list:
+				print 'New Repeat Info:'
+				for call_stack in repeat_info['callstack']:
+					for call_stack_line in call_stack:
+						print '\t',call_stack_line
+
+					j=0
+					while j<min(len(call_stack),len(last_call_stack)):
+						if call_stack[j]!=last_call_stack[j]:
+							break
+						j+=1
+
+					print '\tCommon stack list:',j,call_stack[0:j]
+					print ''
+
+					last_call_stack=deepcopy(call_stack)
+										
+				print '\t',repeat_info['repeated']
+				print ''
+
+		return repeat_info_list
 
 if __name__=='__main__':
 	from optparse import OptionParser
@@ -1401,44 +1502,7 @@ if __name__=='__main__':
 		frame.show()
 		sys.exit(app.exec_())
 
-	else:
-		asasm=ASASM(options.asasm_dir)
-
-		if options.dump:
-			pprint.pprint(asasm.Assemblies)
-
-		if options.replace:
-			replace_patterns=[]
-
-			replace_patterns.append(["_a_--__-","class02"])
-			replace_patterns.append(["_a_-_---","class04"])
-			replace_patterns.append(["_a_-_-__","class06"])
-			replace_patterns.append(["_a_---","class01"])
-			replace_patterns.append(["_a_-_-_","class05"])
-			replace_patterns.append(["_a_-_","class03"])
-
-			new_folder=r"..\payload-0.mod"
-		
-			print asasm.GetName(r'QName(PackageNamespace(""), "class03")')
-			asasm.RetrieveAssemblies(['payload-0'])
-			asasm.Instrument()
-
-			asasm.RetrieveAssemblies(['payload-1'])
-			asasm.Instrument()
-
-		if options.api:
-			asasm.Instrument(operations=[["AddAPITrace",['MultinameL']], ["Include",["../Util-0/Util.script.asasm"]]], target_refids=args)
-
-		if options.method:
-			asasm.Instrument(operations=[["AddMethodTrace",'']])
-
-		if options.basic_blocks:
-			asasm.Instrument(operations=[["AddBasicBlockTrace",'']])
-
-		if options.target_dir:
-			asasm.Save(target_dir=options.target_dir)
-
-	if options.test!=None:
+	elif options.test:
 		if options.test.lower()=='names':
 			asasm=ASASM(options.target_dir)
 			[local_names,api_names,multi_names,multi_namels]=asasm.GetNames()
@@ -1497,4 +1561,39 @@ if __name__=='__main__':
 			asasm=ASASM()
 			asasm.LoadLogFile(args[0])
 
-	
+	else:
+		asasm=ASASM(options.asasm_dir)
+
+		if options.dump:
+			pprint.pprint(asasm.Assemblies)
+
+		if options.replace:
+			replace_patterns=[]
+
+			replace_patterns.append(["_a_--__-","class02"])
+			replace_patterns.append(["_a_-_---","class04"])
+			replace_patterns.append(["_a_-_-__","class06"])
+			replace_patterns.append(["_a_---","class01"])
+			replace_patterns.append(["_a_-_-_","class05"])
+			replace_patterns.append(["_a_-_","class03"])
+
+			new_folder=r"..\payload-0.mod"
+		
+			print asasm.GetName(r'QName(PackageNamespace(""), "class03")')
+			asasm.RetrieveAssemblies(['payload-0'])
+			asasm.Instrument()
+
+			asasm.RetrieveAssemblies(['payload-1'])
+			asasm.Instrument()
+
+		if options.api:
+			asasm.Instrument(operations=[["AddAPITrace",['MultinameL']], ["Include",["../Util-0/Util.script.asasm"]]], target_refids=args)
+
+		if options.method:
+			asasm.Instrument(operations=[["AddMethodTrace",'']])
+
+		if options.basic_blocks:
+			asasm.Instrument(operations=[["AddBasicBlockTrace",'']])
+
+		if options.target_dir:
+			asasm.Save(target_dir=options.target_dir)
