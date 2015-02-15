@@ -317,7 +317,7 @@ class MainWindow(QMainWindow):
 
 	DebugFileOperation=0
 	def open(self):
-		filename = QFileDialog.getOpenFileName(self,"Open SWF","","SWF Files (*.swf)")[0]
+		filename = QFileDialog.getOpenFileName(self,"Open SWF","","SWF Files (*.swf)|All Files (*.*)")[0]
 
 		if filename:
 			self.SWFFilename=filename
@@ -474,7 +474,7 @@ class MainWindow(QMainWindow):
 		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
 	def loadLogTrace(self):
-		filename = QFileDialog.getOpenFileName(self,"Open Log file","","Log Files (*.txt)")[0]
+		filename = QFileDialog.getOpenFileName(self,"Open Log file","","Log Files (*.txt)|All Files (*.*)")[0]
 		if filename:
 			print filename
 			repeat_info_list=self.asasm.LoadLogFile(filename)
