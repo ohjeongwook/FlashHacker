@@ -411,7 +411,7 @@ class MainWindow(QMainWindow):
 			target_root_dir=dir_name 
 
 			#Copy from Scripts\Util-0 to target_root_dir + Util-0\
-			util0_dir=r"Scripts\Util-0"
+			util0_dir=os.path.join(os.path.dirname(os.path.realpath(__file__)),r"Scripts\Util-0")
 			target_util0_dir=os.path.join(target_root_dir,"Util-0")
 
 			try:
@@ -479,15 +479,18 @@ class MainWindow(QMainWindow):
 
 	def addMethodTrace(self):
 		target_root_dir=os.path.dirname(self.SWFFilename)
-		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddMethodTrace",'']])
+		self.asasm.Instrument(operations=[["AddMethodTrace",'']])
+		self.asasm.Save(target_root_dir=target_root_dir)
 
 	def addBasicBlockTrace(self):
 		target_root_dir=os.path.dirname(self.SWFFilename)
-		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddBasicBlockTrace",'']])
+		self.asasm.Instrument(operations=[["AddBasicBlockTrace",'']])
+		self.asasm.Save(target_root_dir=target_root_dir)
 
 	def addAPITrace(self):
 		target_root_dir=os.path.dirname(self.SWFFilename)
-		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
+		self.asasm.Instrument(operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
+		self.asasm.Save(target_root_dir=target_root_dir)
 
 	def loadLogTrace(self):
 		self.tabWidget.setCurrentIndex(2)

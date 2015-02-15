@@ -927,7 +927,7 @@ class ASASM:
 						print '* Instrumenting', file, operation, options
 
 					if operation=="AddBasicBlockTrace":
-						self.Assemblies[root_dir][file][1]=self.AddBasicBlockTrace(self.Assemblies[root_dir][file][1],target_refids=target_refids,filename=file)
+						self.Assemblies[root_dir][file][1]=self.AddBasicBlockTrace(self.Assemblies[root_dir][file][1],filename=file)
 
 					if operation=="AddAPITrace":
 						self.Assemblies[root_dir][file][1]=self.AddAPITrace(self.Assemblies[root_dir][file][1],filename=file,target_refids=target_refids,api_names=api_names,patterns=options)
