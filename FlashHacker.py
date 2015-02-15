@@ -330,7 +330,7 @@ class MainWindow(QMainWindow):
 		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
 		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
 
-		cmdline="%s %s" % (abcexport,filename)
+		cmdline="\"%s\" \"%s\"" % (abcexport,filename)
 
 		if self.DebugFileOperation>-1:
 			print '* Executing: %s' % cmdline
@@ -356,7 +356,7 @@ class MainWindow(QMainWindow):
 					shutil.rmtree(abc_dirname)
 
 				if not os.path.isdir(abc_dirname):
-					cmdline="%s %s" % (rabcdasm,abc_filename)
+					cmdline="\"%s\" \"%s\"" % (rabcdasm,abc_filename)
 					if self.DebugFileOperation>-1:
 						print '* Executing: %s' % cmdline
 
@@ -423,7 +423,7 @@ class MainWindow(QMainWindow):
 				if self.DebugFileOperation>0:
 					print 'Assembling', main_asasm_file
 
-				cmdline="%s %s" % (rabcasm,main_asasm_file)
+				cmdline="\"%s\" \"%s\"" % (rabcasm,main_asasm_file)
 
 				if self.DebugFileOperation>-1:
 					print '* Executing: %s' % cmdline
@@ -442,7 +442,7 @@ class MainWindow(QMainWindow):
 					import traceback
 					traceback.print_exc()
 
-				cmdline="%s %s %d %s" % (abcreplace,swf_outputfilename,i,abc_file)
+				cmdline="\"%s\" \"%s\" %d \"%s\"" % (abcreplace,swf_outputfilename,i,abc_file)
 
 				if self.DebugFileOperation>-1:
 					print '* Executing: %s' % cmdline
