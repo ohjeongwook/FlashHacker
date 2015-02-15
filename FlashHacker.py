@@ -139,6 +139,7 @@ class TreeModel(QAbstractItemModel):
 		last_call_stack=[]
 		node_map={}
 
+		color=None
 		for repeat_info in repeat_info_list:
 			if self.DebugShowTrace>0:
 				print 'New Repeat Info:'
@@ -162,10 +163,18 @@ class TreeModel(QAbstractItemModel):
 					else:
 						if index==0 and i==len(call_stack)-1:
 							repeated_str=str(repeat_info['repeated'])
+							#start of new section
+							if repeat_info['repeated']==1:
+								color=QColor(Qt.white)
+							else:
+								if color==QColor(Qt.yellow) or color==QColor(Qt.white):
+									color=QColor(Qt.green)
+								else:
+									color=QColor(Qt.yellow)
 						else:
 							repeated_str=''
 
-						new_item=TreeItem((call_stack[i],repeated_str),last_root_item)
+						new_item=TreeItem((call_stack[i],repeated_str),last_root_item,assoc_data=color)
 
 						node_map[node_key]=new_item
 						last_root_item.appendChild(new_item)
@@ -212,11 +221,15 @@ class TreeModel(QAbstractItemModel):
 		if not index.isValid():
 			return None
 
-		if role!=Qt.DisplayRole:
-			return None
+		if role==Qt.BackgroundRole:
+			item=index.internalPointer()
+			color=item.getAssocData()
+			return color
 
-		item=index.internalPointer()
-		return item.data(index.column())
+		elif role==Qt.DisplayRole:
+			item=index.internalPointer()
+			return item.data(index.column())
+		return None
 
 	def headerData(self,section,orientation,role):
 		if orientation==Qt.Horizontal and role==Qt.DisplayRole:
@@ -280,23 +293,25 @@ class MainWindow(QMainWindow):
 		self.setWindowTitle("Flash Hacker")
 		self.readSettings()
 
+		self.asasm=ASASM()
+
 		self.Directories=[]
 		self.SWFFilename=''
 
 		vertical_splitter=QSplitter()
-		
-		tab_widget=QTabWidget()
+
+		self.tabWidget=QTabWidget()
 
 		self.classTreeView=QTreeView()
-		tab_widget.addTab(self.classTreeView,"Classes")
+		self.tabWidget.addTab(self.classTreeView,"Classes")
 
 		self.apiTreeView=QTreeView()
-		tab_widget.addTab(self.apiTreeView,"API")
+		self.tabWidget.addTab(self.apiTreeView,"API")
 
 		self.traceTreeView=QTreeView()
-		tab_widget.addTab(self.traceTreeView,"Method trace")
+		self.tabWidget.addTab(self.traceTreeView,"Trace")
 
-		vertical_splitter.addWidget(tab_widget)
+		vertical_splitter.addWidget(self.tabWidget)
 
 		self.graph=MyGraphicsView()
 		self.graph.setRenderHints(QPainter.Antialiasing)
@@ -327,6 +342,7 @@ class MainWindow(QMainWindow):
 		self.openSWF(self.SWFFilename,reload=True)
 
 	def openSWF(self,filename,reload=False):
+		self.tabWidget.setCurrentIndex(0)
 		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
 		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
 
@@ -474,9 +490,9 @@ class MainWindow(QMainWindow):
 		self.asasm.Instrument(target_root_dir=target_root_dir,operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
 
 	def loadLogTrace(self):
+		self.tabWidget.setCurrentIndex(2)
 		filename = QFileDialog.getOpenFileName(self,"Open Log file","","Log Files (*.txt)|All Files (*.*)")[0]
 		if filename:
-			print filename
 			repeat_info_list=self.asasm.LoadLogFile(filename)
 
 			[local_names,api_names,multi_names,multi_namels]=self.asasm.GetNames()
@@ -485,6 +501,8 @@ class MainWindow(QMainWindow):
 			self.traceTreeView.setModel(self.traceTreeModel)
 			#self.traceTreeView.connect(self.traceTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.apiTreeSelected)
 			self.traceTreeView.expandAll()
+			self.traceTreeView.setColumnWidth(0,300)
+			self.traceTreeView.setColumnWidth(1,10)
 
 	def createMenus(self):
 		self.fileMenu=self.menuBar().addMenu("&File")
@@ -535,7 +553,6 @@ class MainWindow(QMainWindow):
 
 	def showDir(self,dirs):
 		self.Directories=dirs
-		self.asasm=ASASM()	
 		self.Assemblies=self.asasm.RetrieveAssemblies(dirs)
 
 		self.treeModel=TreeModel(("Name",))
