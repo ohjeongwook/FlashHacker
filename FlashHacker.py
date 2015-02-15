@@ -427,6 +427,17 @@ class MainWindow(QMainWindow):
 				import traceback
 				traceback.print_exc()
 
+			swf_outputfilename=QFileDialog.getSaveFileName(self,'Save File',target_root_dir,'SWF (*.swf *.*)')[0]
+
+			if self.DebugFileOperation>0:
+				print 'copy',self.SWFFilename,swf_outputfilename
+
+			try:
+				shutil.copy(self.SWFFilename,swf_outputfilename)
+			except:
+				import traceback
+				traceback.print_exc()
+
 			while True:
 				main_asasm_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.asasm' % (main_name,i,main_name,i)).replace('/','\\')
 				abc_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.abc' % (main_name,i,main_name,i)).replace('/','\\')
@@ -447,16 +458,6 @@ class MainWindow(QMainWindow):
 				output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
 				if self.DebugFileOperation>-1:
 					print output
-
-				swf_outputfilename=os.path.join(target_root_dir,'%s-mod.swf' % main_name).replace('/','\\')
-
-				if self.DebugFileOperation>0:
-					print 'swf_outputfilename:', swf_outputfilename
-				try:
-					shutil.copy(self.SWFFilename,swf_outputfilename)
-				except:
-					import traceback
-					traceback.print_exc()
 
 				cmdline="\"%s\" \"%s\" %d \"%s\"" % (abcreplace,swf_outputfilename,i,abc_file)
 
