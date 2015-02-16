@@ -678,79 +678,8 @@ class ASASM:
 
 		return asasm_files
 
-	DebugMethodTrace=0
-	def AddMethodTrace1(self,parsed_lines):
-		if self.DebugMethodTrace>0:
-			print '='*80
-			print '* AddMethodTrace:'
-
-		parents=[]
-		new_parsed_lines=[]
-		refid=''
-		for [prefix,keyword,parameter,comment] in parsed_lines:
-			if self.DebugMethodTrace>1:
-				print '>',prefix,keyword,parameter,comment
-
-			if keyword in self.BlockKeywords:
-				if parameter[-3:]!='end':
-					parents.append([keyword,parameter])
-				if self.DebugMethodTrace>0:
-					print '* parents:',parents
-
-			elif keyword=='end':
-				if self.DebugMethodTrace>0:
-					print '* end tag:',refid
-					print prefix,keyword,parameter,comment
-					pprint.pprint(parents)
-
-				if len(parents)>0:
-					del parents[-1]
-				else:
-					print '* Error parsing', refid
-					print prefix,keyword,parameter,comment
-
-			elif keyword=='refid':
-				refid=parameter[1:-1]
-				if self.DebugMethodTrace>0:
-					print '*'*80
-					print 'refid:', refid
-
-			if keyword=='code':
-				type=''
-				description=''
-
-				if refid:
-					description=refid
-				else:
-					for [keyword,parameter] in parents:
-						if keyword=='instance':
-							description+='instance: ' + self.GetName(parameter)
-						elif keyword=='trait':
-							description+=' trait: ' + self.GetName(parameter)
-
-					description+=' type: ' + parents[-3][0]
-
-				new_parsed_lines.append([prefix,keyword,parameter,comment])
-				if parents[-3][0]=='method':
-					if self.DebugMethodTrace>0:
-						print 'Adding trace', description
-					new_parsed_lines.append([prefix + ' ','findpropstrict','QName(PackageNamespace(""), "trace")',''])
-					new_parsed_lines.append([prefix + ' ','pushstring','"Enter: %s"' % description,''])
-					new_parsed_lines.append([prefix + ' ','callpropvoid','QName(PackageNamespace(""), "trace"), 1',''])
-			else:
-				if len(parents)>2 and parents[-3][0]=='method' and parents[-1][0]=='code' and keyword.startswith('return'): 
-					if self.DebugMethodTrace>0:
-						print 'Adding end trace', description
-					new_parsed_lines.append([prefix + ' ','findpropstrict','QName(PackageNamespace(""), "trace")',''])
-					new_parsed_lines.append([prefix + ' ','pushstring','"Return: %s"' % description,''])
-					new_parsed_lines.append([prefix + ' ','callpropvoid','QName(PackageNamespace(""), "trace"), 1',''])
-
-				new_parsed_lines.append([prefix,keyword,parameter,comment])
-
-		return new_parsed_lines
-
 	DebugBasicBlockTrace=0
-	def AddBasicBlockTrace(self,methods,type='block',filename=''):
+	def AddBasicBlockTrace(self,methods,type='block',filename='',use_buffered_trace=True):
 		for refid in methods.keys():
 			(blocks,maps,labels,parents,body_parameters)=methods[refid]
 			for block_id in blocks.keys():
@@ -767,30 +696,48 @@ class ASASM:
 				if type=='block':
 					if parents[-3][0]=='method' and labels.has_key(block_id) and blocks[block_id][0][0]!='label':
 						trace_code=[]
-						trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+
 						if labels.has_key(block_id):
 							message=labels[block_id]
 						else:
 							message='enter function'
 
-						trace_code.append(['pushstring','"    Label: %s"' % (message)])
-						trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
+						if use_buffered_trace:
+							trace_code.append(['getlex','QName(PackageNamespace(""), "Util")'])
+							trace_code.append(['pushstring','"    Label: %s"' % (message)])
+							trace_code.append(['callpropvoid','QName(PackageNamespace(""), "DumpMessage"), 1'])
+						else:
+							trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+							trace_code.append(['pushstring','"    Label: %s"' % (message)])
+							trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
+
 						blocks[block_id][0:0]=trace_code
 				
 				if parents[-3][0]=='method':
 					if block_id==0:
 						trace_code=[]
-						trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
-						trace_code.append(['pushstring','"Enter: %s"' % (refid)])
-						trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
+
+						if use_buffered_trace:
+							trace_code.append(['getlex','QName(PackageNamespace(""), "Util")'])
+							trace_code.append(['pushstring','"Enter: %s"' % (refid)])
+							trace_code.append(['callpropvoid','QName(PackageNamespace(""), "DumpMessage"), 1'])
+						else:
+							trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+							trace_code.append(['pushstring','"Enter: %s"' % (refid)])
+							trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
 						blocks[block_id][0:0]=trace_code
 
 					new_block=[]
 					for [op,operand] in blocks[block_id]:
 						if op.startswith('return'):
-							new_block.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
-							new_block.append(['pushstring','"Return: %s"' % (refid)])
-							new_block.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
+							if use_buffered_trace:
+								new_block.append(['getlex','QName(PackageNamespace(""), "Util")'])
+								new_block.append(['pushstring','"Return: %s"' % (refid)])
+								new_block.append(['callpropvoid','QName(PackageNamespace(""), "DumpMessage"), 1'])
+							else:
+								new_block.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
+								new_block.append(['pushstring','"Return: %s"' % (refid)])
+								new_block.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
 						new_block.append([op,operand])
 
 					if len(new_block)>0:

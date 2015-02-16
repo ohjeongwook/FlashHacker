@@ -6,6 +6,7 @@ package
 
 	public class Util
 	{
+		private static var messageBuffer:String="";
 		public function Util() {
 		}
 
@@ -15,29 +16,40 @@ package
 			test.push(car);
 		}
 
+		public static function DumpMessage(message:String):void
+		{
+			messageBuffer+=message+"\n";
+
+			if(message.indexOf("Return:")==0)
+			{
+				trace(messageBuffer);
+				messageBuffer="";
+			}
+		}
+
 		public static function DumpAPI(filename:String, refid:String, instruction:String, array:Array):void
 		{
-			trace("        API:" + instruction);
-			trace("            From: "+filename + "\t" + refid);
+			messageBuffer+="        API:" + instruction +"\n";
+			messageBuffer+="            From: "+filename + "\t" + refid +"\n";
 
 			for(var i:int=0;i<array.length;i++)
 			{
 				var className:String = getQualifiedClassName( array[i] );
-				trace("* " +className + ":");
+				messageBuffer+="* " +className + ":" +"\n";
 
 				if(className=="String")
 				{
-					trace(array[i]);
+					messageBuffer+=array[i] +"\n";
 				}else if(className=="flash.utils::ByteArray")
 				{
-					trace(DumpByteArray(array[i]));
+					messageBuffer+=DumpByteArray(array[i]) +"\n";
 				}
 				else
 				{
-					trace(array[i]);
+					messageBuffer+=array[i] +"\n";
 				}
 			}
-			trace("");
+			messageBuffer+="" +"\n";
 		}
 
 		public static function DumpByteArray(buffer:ByteArray):String

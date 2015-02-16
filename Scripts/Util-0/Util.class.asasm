@@ -57,7 +57,7 @@ class
  cinit
   refid "Util/class/init"
   body
-   maxstack 1
+   maxstack 2
    localcount 1
    initscopedepth 3
    maxscopedepth 4
@@ -65,11 +65,58 @@ class
     getlocal0
     pushscope
 
+    findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+    pushstring          ""
+    setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+
     returnvoid
    end ; code
   end ; body
  end ; method
- trait method QName(PackageNamespace(""), "DumpAPI") flag FINAL dispid 3
+ trait slot QName(PrivateNamespace(null, "Util/class"), "messageBuffer") slotid 1 type QName(PackageNamespace(""), "String") value Utf8("") end
+ trait method QName(PackageNamespace(""), "DumpMessage") flag FINAL dispid 3
+  method
+   refid "Util/class/DumpMessage"
+   param QName(PackageNamespace(""), "String")
+   returns QName(PackageNamespace(""), "void")
+   body
+    maxstack 4
+    localcount 2
+    initscopedepth 3
+    maxscopedepth 4
+    code
+     getlocal0
+     pushscope
+
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlocal1
+     pushstring          "\n"
+     add
+     add
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+
+     getlocal1
+     pushstring          "Return:"
+     callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "indexOf"), 1
+     pushbyte            0
+     ifne                L20
+
+     findpropstrict      QName(PackageNamespace(""), "trace")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     pushstring          ""
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+
+L20:
+     returnvoid
+    end ; code
+   end ; body
+  end ; method
+ end ; trait
+ trait method QName(PackageNamespace(""), "DumpAPI") flag FINAL dispid 4
   method
    refid "Util/class/DumpAPI"
    param QName(PackageNamespace(""), "String")
@@ -78,7 +125,7 @@ class
    param QName(PackageNamespace(""), "Array")
    returns QName(PackageNamespace(""), "void")
    body
-    maxstack 4
+    maxstack 5
     localcount 7
     initscopedepth 3
     maxscopedepth 4
@@ -90,13 +137,18 @@ class
      coerce_s
      setlocal            6
 
-     findpropstrict      QName(PackageNamespace(""), "trace")
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
      pushstring          "        API:"
      getlocal3
      add
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+     pushstring          "\n"
+     add
+     add
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
 
-     findpropstrict      QName(PackageNamespace(""), "trace")
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
      pushstring          "            From: "
      getlocal1
      add
@@ -104,83 +156,106 @@ class
      add
      getlocal2
      add
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+     pushstring          "\n"
+     add
+     add
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
 
      pushbyte            0
      setlocal            5
 
-     jump                L63
+     jump                L87
 
-L22:
+L30:
      label
      findpropstrict      QName(PackageNamespace("flash.utils"), "getQualifiedClassName")
      getlocal            4
      getlocal            5
-     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
      callproperty        QName(PackageNamespace("flash.utils"), "getQualifiedClassName"), 1
      coerce_s
      setlocal            6
 
-     findpropstrict      QName(PackageNamespace(""), "trace")
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
      pushstring          "* "
      getlocal            6
      add
      pushstring          ":"
      add
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+     pushstring          "\n"
+     add
+     add
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
 
      getlocal            6
      pushstring          "String"
-     ifne                L46
+     ifne                L62
 
-     findpropstrict      QName(PackageNamespace(""), "trace")
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
      getlocal            4
      getlocal            5
-     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     pushstring          "\n"
+     add
+     add
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
 
-     jump                L62
+     jump                L86
 
-L46:
+L62:
      getlocal            6
      pushstring          "flash.utils::ByteArray"
-     ifne                L57
+     ifne                L77
 
-     findpropstrict      QName(PackageNamespace(""), "trace")
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
      findpropstrict      QName(PackageNamespace(""), "DumpByteArray")
      getlocal            4
      getlocal            5
-     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
      callproperty        QName(PackageNamespace(""), "DumpByteArray"), 1
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+     pushstring          "\n"
+     add
+     add
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
 
-     jump                L62
+     jump                L86
 
-L57:
-     findpropstrict      QName(PackageNamespace(""), "trace")
+L77:
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
      getlocal            4
      getlocal            5
-     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+     getproperty         MultinameL([PrivateNamespace(null, "Util/class"), Namespace("http://adobe.com/AS3/2006/builtin"), PackageNamespace(""), PackageNamespace("flash.utils"), PrivateNamespace(null, "Util/class/DumpAPI"), PackageInternalNs(""), PackageNamespace("flash.text"), PackageNamespace("flash.net"), ProtectedNamespace("Util"), StaticProtectedNs("Util")])
+     pushstring          "\n"
+     add
+     add
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
 
-L62:
+L86:
      inclocal_i          5
-L63:
+L87:
      getlocal            5
      getlocal            4
      getproperty         QName(PackageNamespace(""), "length")
-     iflt                L22
+     iflt                L30
 
-     findpropstrict      QName(PackageNamespace(""), "trace")
+     findproperty        QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
+     getlex              QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
      pushstring          ""
-     callpropvoid        QName(PackageNamespace(""), "trace"), 1
+     pushstring          "\n"
+     add
+     add
+     setproperty         QName(PrivateNamespace(null, "Util/class"), "messageBuffer")
 
      returnvoid
     end ; code
    end ; body
   end ; method
  end ; trait
- trait method QName(PackageNamespace(""), "DumpByteArray") flag FINAL dispid 4
+ trait method QName(PackageNamespace(""), "DumpByteArray") flag FINAL dispid 5
   method
    refid "Util/class/DumpByteArray"
    param QName(PackageNamespace("flash.utils"), "ByteArray")
@@ -367,7 +442,7 @@ L126:
    end ; body
   end ; method
  end ; trait
- trait method QName(PrivateNamespace(null, "Util/class"), "fillUp") flag FINAL dispid 5
+ trait method QName(PrivateNamespace(null, "Util/class"), "fillUp") flag FINAL dispid 6
   method
    refid "Util/class/Util/class/fillUp"
    param QName(PackageNamespace(""), "String")
