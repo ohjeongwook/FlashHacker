@@ -297,6 +297,7 @@ class MainWindow(QMainWindow):
 
 		self.Directories=[]
 		self.SWFFilename=''
+		self.SWFOutFilename=''
 
 		vertical_splitter=QSplitter()
 
@@ -396,6 +397,10 @@ class MainWindow(QMainWindow):
 
 		self.showDir(abc_dirnames)
 
+	def saveAs(self):
+		self.SWFOutFilename=''
+		self.save()
+
 	def save(self):
 		rabcasm=os.path.join(self.RABCDAsmPath,"rabcasm.exe")
 		abcreplace=os.path.join(self.RABCDAsmPath,"abcreplace.exe")
@@ -427,13 +432,14 @@ class MainWindow(QMainWindow):
 				import traceback
 				traceback.print_exc()
 
-			swf_outputfilename=QFileDialog.getSaveFileName(self,'Save File',target_root_dir,'SWF (*.swf *.*)')[0]
+			if not self.SWFOutFilename:
+				self.SWFOutFilename=QFileDialog.getSaveFileName(self,'Save File',target_root_dir,'SWF (*.swf *.*)')[0]
 
 			if self.DebugFileOperation>0:
-				print 'copy',self.SWFFilename,swf_outputfilename
+				print 'copy',self.SWFFilename,self.SWFOutFilename
 
 			try:
-				shutil.copy(self.SWFFilename,swf_outputfilename)
+				shutil.copy(self.SWFFilename,self.SWFOutFilename)
 			except:
 				import traceback
 				traceback.print_exc()
@@ -459,7 +465,7 @@ class MainWindow(QMainWindow):
 				if self.DebugFileOperation>-1:
 					print output
 
-				cmdline="\"%s\" \"%s\" %d \"%s\"" % (abcreplace,swf_outputfilename,i,abc_file)
+				cmdline="\"%s\" \"%s\" %d \"%s\"" % (abcreplace,self.SWFOutFilename,i,abc_file)
 
 				if self.DebugFileOperation>-1:
 					print '* Executing: %s' % cmdline
@@ -524,6 +530,12 @@ class MainWindow(QMainWindow):
 									self,
 									triggered=self.save)
 		self.fileMenu.addAction(self.saveAct)
+
+
+		self.saveAsAct=QAction("&Save As...",
+									self,
+									triggered=self.saveAs)
+		self.fileMenu.addAction(self.saveAsAct)
 
 		self.openDirAct=QAction("&Open directory...",
 									self,
