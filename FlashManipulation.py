@@ -1333,7 +1333,7 @@ class ASASM:
 
 						if self.DebugLoadLogFile>0:
 							print '\t+Repetition continuation %d repeated' % (repeat_info['repeated'])
-
+						non_repetition_start=i
 					else:
 						if self.DebugLoadLogFile>0:
 							print '\t> New repetition started: (%d:%d == %d:%d) %s' % (i-n*2,i-n, i-n,i, callstack_list[i-n:i])
@@ -1341,7 +1341,7 @@ class ASASM:
 							print '\t\t', pprint.pformat(callstack_list[non_repetition_start:i-n*2])
 
 						repeat_info_list.append({'callstack': callstack_list[non_repetition_start:i-n*2], 'repeated': 1})
-
+						non_repetition_start=i
 						repeat_info['callstack']=callstack_list[i-n:i]
 						repeat_info['repeated']=2
 
@@ -1367,6 +1367,9 @@ class ASASM:
 
 				last_repeated_n=0
 		
+		if non_repetition_start!=len(callstack_list)-1:
+			repeat_info_list.append({'callstack': callstack_list[non_repetition_start:], 'repeated': 1})
+
 		if len(repeat_info)>0:
 			if self.DebugLoadLogFile>0:
 				print repeat_info['callstack'], "repeated\t", repeat_info['repeated']
