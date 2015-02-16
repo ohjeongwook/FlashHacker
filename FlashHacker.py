@@ -341,7 +341,7 @@ class MainWindow(QMainWindow):
 	def reload(self):
 		self.openSWF(self.SWFFilename,reload=True)
 
-	def openSWF(self,filename,reload=False):
+	def openSWF(self,filename,reload=True):
 		self.SWFFilename=filename
 		self.tabWidget.setCurrentIndex(0)
 		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
