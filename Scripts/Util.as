@@ -45,6 +45,7 @@ package
 			var lines:String = fillUp("Offset", 8, " ") + "  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n";
 			var offset:int = 0;
 			var l:int = buffer.length;
+			var origPosition:uint = buffer.position;
 			buffer.position = 0;
 			
 			for (var i:int = 0; i < l; i += 16)
@@ -69,6 +70,8 @@ package
 				}
 				lines += " " + ascii_line + "\n";
 			}
+
+			buffer.position = origPosition;
 			return lines;
 		}
 				

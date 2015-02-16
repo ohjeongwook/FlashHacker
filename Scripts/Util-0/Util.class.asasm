@@ -187,7 +187,7 @@ L63:
    returns QName(PackageNamespace(""), "String")
    body
     maxstack 5
-    localcount 10
+    localcount 11
     initscopedepth 3
     maxscopedepth 4
     code
@@ -195,17 +195,17 @@ L63:
      pushscope
 
      pushbyte            0
-     setlocal            6
+     setlocal            7
 
      pushnull
      coerce_s
-     setlocal            7
-
-     pushbyte            0
      setlocal            8
 
      pushbyte            0
      setlocal            9
+
+     pushbyte            0
+     setlocal            10
 
      findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
      pushstring          "Offset"
@@ -225,15 +225,20 @@ L63:
      setlocal            4
 
      getlocal1
+     getproperty         QName(PackageNamespace(""), "position")
+     convert_u
+     setlocal            5
+
+     getlocal1
      pushbyte            0
      setproperty         QName(PackageNamespace(""), "position")
 
      pushbyte            0
-     setlocal            5
+     setlocal            6
 
-     jump                L122
+     jump                L126
 
-L31:
+L35:
      label
      getlocal2
      findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
@@ -259,50 +264,50 @@ L31:
      subtract
      callproperty        QName(PackageNamespace(""), "min"), 2
      convert_i
-     setlocal            6
-
-     pushstring          ""
      setlocal            7
 
-     pushbyte            0
+     pushstring          ""
      setlocal            8
 
-     jump                L105
+     pushbyte            0
+     setlocal            9
 
-L61:
+     jump                L109
+
+L65:
      label
-     getlocal            8
-     getlocal            6
-     ifnlt               L100
+     getlocal            9
+     getlocal            7
+     ifnlt               L104
 
      getlocal1
      callproperty        QName(PackageNamespace(""), "readUnsignedByte"), 0
      convert_i
-     setlocal            9
+     setlocal            10
 
-     getlocal            7
-     getlocal            9
+     getlocal            8
+     getlocal            10
      pushbyte            32
      greaterequals
-     iffalse             L79
+     iffalse             L83
 
      getlex              QName(PackageNamespace(""), "String")
-     getlocal            9
+     getlocal            10
      callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "fromCharCode"), 1
      coerce_a
-     jump                L81
+     jump                L85
 
-L79:
+L83:
      pushstring          "."
      coerce_a
-L81:
+L85:
      add
      coerce_s
-     setlocal            7
+     setlocal            8
 
      getlocal2
      findpropstrict      QName(PrivateNamespace(null, "Util/class"), "fillUp")
-     getlocal            9
+     getlocal            10
      pushbyte            16
      callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "toString"), 1
      callproperty        QName(Namespace("http://adobe.com/AS3/2006/builtin"), "toUpperCase"), 0
@@ -316,24 +321,24 @@ L81:
      setlocal2
 
      inclocal_i          3
-     jump                L104
+     jump                L108
 
-L100:
+L104:
      getlocal2
      pushstring          "   "
      add
      setlocal2
 
-L104:
-     inclocal_i          8
-L105:
-     getlocal            8
+L108:
+     inclocal_i          9
+L109:
+     getlocal            9
      pushbyte            16
-     iflt                L61
+     iflt                L65
 
      getlocal2
      pushstring          " "
-     getlocal            7
+     getlocal            8
      add
      pushstring          "\n"
      add
@@ -341,16 +346,20 @@ L105:
      coerce_s
      setlocal2
 
-     getlocal            5
+     getlocal            6
      pushbyte            16
      add
      convert_i
-     setlocal            5
+     setlocal            6
 
-L122:
-     getlocal            5
+L126:
+     getlocal            6
      getlocal            4
-     iflt                L31
+     iflt                L35
+
+     getlocal1
+     getlocal            5
+     setproperty         QName(PackageNamespace(""), "position")
 
      getlocal2
      returnvalue
