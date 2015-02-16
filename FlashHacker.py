@@ -7,6 +7,46 @@ import shutil
 
 from FlashManipulation import *
 
+class InstrumentOptionDialog(QDialog):
+	def __init__(self,parent=None,rabcdasm='',log_level=0):
+		super(InstrumentOptionDialog,self).__init__(parent)
+		self.setWindowTitle("Instrument Option")
+
+		self.method_cb=QCheckBox('Methods',self)
+		self.bb_cb=QCheckBox('Basic Blocks',self)
+		self.api_cb=QCheckBox('APIs',self)
+
+		buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+		buttonBox.accepted.connect(self.accept)
+		buttonBox.rejected.connect(self.reject)
+
+		main_layout=QGridLayout()
+		main_layout.addWidget(self.method_cb,0,0)
+		main_layout.addWidget(self.bb_cb,1,0)
+		main_layout.addWidget(self.api_cb,2,0)
+		main_layout.addWidget(buttonBox,3,1)
+
+		self.setLayout(main_layout)
+
+	def keyPressEvent(self,e):
+		key=e.key()
+
+		if key==Qt.Key_Return or key==Qt.Key_Enter:
+			return
+		else:
+			super(ConfigurationDialog,self).keyPressEvent(e)
+
+	def GetCheckState(self):
+		checked={'Method':False,'BasicBlock':False,'API':False}
+		if self.method_cb.isChecked():
+			checked['Method']=True
+		if self.bb_cb.isChecked():
+			checked['BasicBlock']=True
+		if self.api_cb.isChecked():
+			checked['API']=True
+
+		return checked
+
 class ConfigurationDialog(QDialog):
 	def __init__(self,parent=None,rabcdasm='',log_level=0):
 		super(ConfigurationDialog,self).__init__(parent)
@@ -484,20 +524,27 @@ class MainWindow(QMainWindow):
 		if directory:
 			self.showDir([directory])
 
-	def addMethodTrace(self):
-		target_root_dir=os.path.dirname(self.SWFFilename)
-		self.asasm.Instrument(operations=[["AddMethodTrace",'']])
-		self.asasm.Save(target_root_dir=target_root_dir)
+	def performInstrument(self):
+		#Show dialog
+		dialog=InstrumentOptionDialog()
+		if dialog.exec_():
+			checked=dialog.GetCheckState()
 
-	def addBasicBlockTrace(self):
-		target_root_dir=os.path.dirname(self.SWFFilename)
-		self.asasm.Instrument(operations=[["AddBasicBlockTrace",'']])
-		self.asasm.Save(target_root_dir=target_root_dir)
+			if checked['API'] or checked['BasicBlock'] or checked['Method']:
+				target_root_dir=os.path.dirname(self.SWFFilename)
 
-	def addAPITrace(self):
-		target_root_dir=os.path.dirname(self.SWFFilename)
-		self.asasm.Instrument(operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
-		self.asasm.Save(target_root_dir=target_root_dir)
+				if checked['API']:
+					self.asasm.Instrument(operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
+
+				if checked['BasicBlock']:
+					self.asasm.Instrument(operations=[["AddBasicBlockTrace",'']])
+
+				elif checked['Method']:
+					self.asasm.Instrument(operations=[["AddMethodTrace",'']])
+				
+				
+				self.asasm.Save(target_root_dir=target_root_dir)
+				self.saveAs()
 
 	def loadLogTrace(self):
 		self.tabWidget.setCurrentIndex(2)
@@ -526,17 +573,6 @@ class MainWindow(QMainWindow):
 									triggered=self.reload)
 		self.fileMenu.addAction(self.reloadAct)
 
-		self.saveAct=QAction("&Save...",
-									self,
-									triggered=self.save)
-		self.fileMenu.addAction(self.saveAct)
-
-
-		self.saveAsAct=QAction("&Save As...",
-									self,
-									triggered=self.saveAs)
-		self.fileMenu.addAction(self.saveAsAct)
-
 		self.openDirAct=QAction("&Open directory...",
 									self,
 									shortcut=QKeySequence.Open,
@@ -545,20 +581,10 @@ class MainWindow(QMainWindow):
 		self.fileMenu.addAction(self.openDirAct)
 		self.instrumentMenu=self.menuBar().addMenu("&Instrument")
 
-		self.addMethodTraceAct=QAction("&Add method traces...",
+		self.performInstrumentAct=QAction("&Perform Instrument...",
 									self,
-									triggered=self.addMethodTrace)
-		self.instrumentMenu.addAction(self.addMethodTraceAct)
-
-		self.addBasicBlockTraceAct=QAction("&Add basic block traces...",
-									self,
-									triggered=self.addBasicBlockTrace)
-		self.instrumentMenu.addAction(self.addBasicBlockTraceAct)
-
-		self.addAPITraceAct=QAction("&Add API traces...",
-									self,
-									triggered=self.addAPITrace)
-		self.instrumentMenu.addAction(self.addAPITraceAct)
+									triggered=self.performInstrument)
+		self.instrumentMenu.addAction(self.performInstrumentAct)
 
 		self.traceMenu=self.menuBar().addMenu("&Trace")
 
