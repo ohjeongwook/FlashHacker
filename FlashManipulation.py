@@ -781,7 +781,7 @@ class ASASM:
 					if block_id==0:
 						trace_code=[]
 						trace_code.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
-						trace_code.append(['pushstring','"Enter: %s\t%s"' % (filename,refid)])
+						trace_code.append(['pushstring','"Enter: %s"' % (refid)])
 						trace_code.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
 						blocks[block_id][0:0]=trace_code
 
@@ -789,7 +789,7 @@ class ASASM:
 					for [op,operand] in blocks[block_id]:
 						if op.startswith('return'):
 							new_block.append(['findpropstrict','QName(PackageNamespace(""), "trace")'])
-							new_block.append(['pushstring','"Return: %s\t%s"' % (filename,refid)])
+							new_block.append(['pushstring','"Return: %s"' % (refid)])
 							new_block.append(['callpropvoid','QName(PackageNamespace(""), "trace"), 1'])
 						new_block.append([op,operand])
 
@@ -1420,10 +1420,11 @@ class ASASM:
 
 				last_repeated_n=0
 		
-		if self.DebugLoadLogFile>0:
-			print repeat_info['callstack'], "repeated\t", repeat_info['repeated']
+		if len(repeat_info)>0:
+			if self.DebugLoadLogFile>0:
+				print repeat_info['callstack'], "repeated\t", repeat_info['repeated']
 
-		repeat_info_list.append(deepcopy(repeat_info))
+			repeat_info_list.append(deepcopy(repeat_info))
 
 		if self.DebugLoadLogFile>0:
 			pprint.pprint(repeat_info_list)
