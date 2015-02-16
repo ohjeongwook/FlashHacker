@@ -336,13 +336,13 @@ class MainWindow(QMainWindow):
 		filename = QFileDialog.getOpenFileName(self,"Open SWF","","SWF Files (*.swf)|All Files (*.*)")[0]
 
 		if filename:
-			self.SWFFilename=filename
-			self.openSWF(self.SWFFilename)
+			self.openSWF(filename)
 
 	def reload(self):
 		self.openSWF(self.SWFFilename,reload=True)
 
 	def openSWF(self,filename,reload=False):
+		self.SWFFilename=filename
 		self.tabWidget.setCurrentIndex(0)
 		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
 		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
@@ -435,7 +435,7 @@ class MainWindow(QMainWindow):
 			if not self.SWFOutFilename:
 				self.SWFOutFilename=QFileDialog.getSaveFileName(self,'Save File',target_root_dir,'SWF (*.swf *.*)')[0]
 
-			if self.DebugFileOperation>0:
+			if self.DebugFileOperation>-1:
 				print 'copy',self.SWFFilename,self.SWFOutFilename
 
 			try:
@@ -691,7 +691,11 @@ if __name__=='__main__':
 	window=MainWindow()
 
 	if len(sys.argv)>1:
-		window.showDir(sys.argv[1:])
+		for filename in sys.argv[1:]:
+			if os.path.isfile(filename):
+				window.openSWF(filename)
+			else:
+				window.showDir(filename)
 
 	window.show()
 	#splash.finish(window)
