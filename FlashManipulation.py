@@ -775,13 +775,16 @@ class ASASM:
 
 		return False
 
-	def AddAPITrace(self,methods,filename='',target_refids=[],api_names={},patterns=[]):
+	def AddAPITrace(self,methods,filename='',locator={},api_names={},patterns=[]):
 		for refid in methods.keys():
-			if len(target_refids)>0 and not refid in target_refids:
+			if len(locator)>0 and not locator.has_key(refid):
 				continue
 
 			(blocks,maps,labels,parents,body_parameters)=methods[refid]
 			for block_id in blocks.keys():
+				if len(locator)>0 and not locator[refid].has_key(block_id):
+					continue
+
 				if self.DebugAddAPITrace>1:
 					print "="*80
 					print ' %d' % block_id
@@ -795,7 +798,11 @@ class ASASM:
 				if parents[-3][0]=='method':
 					max_stack_count=0
 
+					line_no=0
 					for (keyword,parameter) in blocks[block_id]:
+						if len(locator)>0 and not locator[refid][block_id].has_key(line_no):
+							continue
+
 						if keyword[0:4]=='call' and (api_names.has_key(self.ParseArray(parameter)[0]) or parameter.startswith('Multiname')) and self.HasPattern(patterns,parameter):
 							stack_count=self.GetCallStackCount(keyword,parameter)
 							if self.DebugAddAPITrace >0:
@@ -803,6 +810,8 @@ class ASASM:
 								print keyword, parameter,stack_count
 							if stack_count>max_stack_count:
 								max_stack_count=stack_count
+
+						line_no+=1
 
 					orig_localcount=0
 					if max_stack_count>0:
@@ -820,8 +829,20 @@ class ASASM:
 						body_parameters=self.AdjustParameter(body_parameters,'maxstack',5)
 
 					new_blocks=[]
+					line_no=0
 					for (keyword,parameter) in blocks[block_id]:
-						if keyword[0:4]=='call' and (api_names.has_key(self.ParseArray(parameter)[0]) or parameter.startswith('Multiname')) and self.HasPattern(patterns,parameter):
+						if self.DebugAddAPITrace>1:
+							print refid,block_id
+							print 'Line no:',line_no
+							pprint.pprint(locator[refid][block_id])
+
+						if len(locator)>0 and not locator[refid][block_id].has_key(line_no):
+							pass
+
+						elif keyword[0:4]=='call' and (len(locator)>0 or (api_names.has_key(self.ParseArray(parameter)[0]) or parameter.startswith('Multiname')) and self.HasPattern(patterns,parameter)):
+							if self.DebugAddAPITrace >-1:
+								print "Hooking %s %s (at %s/%d/%d)" % (keyword,parameter,refid,block_id,line_no)
+
 							escaped_parameter=parameter.replace('"','\\"')
 
 							stack_count=self.GetCallStackCount(keyword,parameter)
@@ -856,28 +877,36 @@ class ASASM:
 								for i in range(0,stack_count,1):
 									new_blocks.append(['getlocal','%d' % (current_local_count-1-i) ])
 
-						new_blocks.append([keyword,parameter])	
+						new_blocks.append([keyword,parameter])
+						line_no+=1
 
 					blocks[block_id]=new_blocks
 
 			methods[refid]=(blocks,maps,labels,parents,body_parameters)
 		return methods
 
-	DebugInstrument=1
+	DebugInstrument=0
 	def Instrument(self,operations=[],target_refids=[]):
 		[local_names,api_names,multi_names,multi_namels]=self.GetNames()
 
 		for root_dir in self.Assemblies.keys():
 			for file in self.Assemblies[root_dir].keys():
 				for (operation,options) in operations:
-					if self.DebugInstrument>-1:
+					if self.DebugInstrument>0:
 						print '* Instrumenting', file, operation, options
 
 					if operation=="AddBasicBlockTrace":
 						self.Assemblies[root_dir][file][1]=self.AddBasicBlockTrace(self.Assemblies[root_dir][file][1],filename=file)
 
 					if operation=="AddAPITrace":
-						self.Assemblies[root_dir][file][1]=self.AddAPITrace(self.Assemblies[root_dir][file][1],filename=file,target_refids=target_refids,api_names=api_names,patterns=options)
+						patterns=[]
+						if options.has_key('Patterns'):
+							patterns=options['Patterns']
+
+						if options.has_key('Locator'):
+							locator=options['Locator']
+
+						self.Assemblies[root_dir][file][1]=self.AddAPITrace(self.Assemblies[root_dir][file][1],filename=file,locator=locator,api_names=api_names,patterns=patterns)
 
 					if operation=="Replace":
 						for [orig,replace] in options:
@@ -1135,6 +1164,20 @@ class ASASM:
 		return [name_type,elements]
 
 	DebugNames=0
+	def GetAPINames(self):
+		[local_names,api_names,multi_names,multi_namels]=self.GetNames()
+
+		ret=[]
+		for [api_name,callers] in api_names.items():
+			found_call=False
+			for [op,root_dir,class_name,refid,block_id,block_line_no] in callers:
+				if op.startswith('call'):
+					found_call=True
+					break
+			if found_call:
+				ret.append(api_name)
+		return ret
+
 	def GetNames(self):
 		local_namespaces={}
 		refids={}
@@ -1170,11 +1213,10 @@ class ASASM:
 					for [block_id,block] in blocks.items():
 						block_line_no=0
 						for [op,operand] in block:
-							if not operand:
-								block_line_no+=1
+							if not op:
 								continue
 
-							if operand.startswith('"'):
+							if not operand or operand.startswith('"'):
 								pass
 							elif operand.startswith('QName('):
 								if self.DebugNames>0:
@@ -1538,7 +1580,7 @@ if __name__=='__main__':
 			asasm.Instrument()
 
 		if options.api:
-			asasm.Instrument(operations=[["AddAPITrace",['MultinameL']], ["Include",["../Util-0/Util.script.asasm"]]], target_refids=args)
+			asasm.Instrument(operations=[["AddAPITrace",{'Patterns':['MultinameL']}], ["Include",["../Util-0/Util.script.asasm"]]], target_refids=args)
 
 		if options.method:
 			asasm.Instrument(operations=[["AddMethodTrace",'']])

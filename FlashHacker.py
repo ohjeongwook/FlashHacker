@@ -8,13 +8,20 @@ import shutil
 from FlashManipulation import *
 
 class InstrumentOptionDialog(QDialog):
-	def __init__(self,parent=None,rabcdasm='',log_level=0):
+	def __init__(self,parent=None,asasm=None):
 		super(InstrumentOptionDialog,self).__init__(parent)
 		self.setWindowTitle("Instrument Option")
 
 		self.method_cb=QCheckBox('Methods',self)
 		self.bb_cb=QCheckBox('Basic Blocks',self)
 		self.api_cb=QCheckBox('APIs',self)
+
+		self.apiTreeView=QTreeView()
+		[local_names,api_names,multi_names,multi_namels]=asasm.GetNames()
+		self.apiTreeModel=TreeModel(("Name",),checkable=True)
+		self.apiTreeModel.showAPIs(api_names,multi_namels,show_call_op=True,single_column=True,show_caller=True)
+		self.apiTreeView.setModel(self.apiTreeModel)
+		#self.apiTreeView.expandAll()			
 
 		buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
 		buttonBox.accepted.connect(self.accept)
@@ -24,9 +31,11 @@ class InstrumentOptionDialog(QDialog):
 		main_layout.addWidget(self.method_cb,0,0)
 		main_layout.addWidget(self.bb_cb,1,0)
 		main_layout.addWidget(self.api_cb,2,0)
-		main_layout.addWidget(buttonBox,3,1)
+		main_layout.addWidget(self.apiTreeView,3,0)
+		main_layout.addWidget(buttonBox,4,0)
 
 		self.setLayout(main_layout)
+		self.resize(950,500)
 
 	def keyPressEvent(self,e):
 		key=e.key()
@@ -34,7 +43,7 @@ class InstrumentOptionDialog(QDialog):
 		if key==Qt.Key_Return or key==Qt.Key_Enter:
 			return
 		else:
-			super(ConfigurationDialog,self).keyPressEvent(e)
+			super(InstrumentOptionDialog,self).keyPressEvent(e)
 
 	def GetCheckState(self):
 		checked={'Method':False,'BasicBlock':False,'API':False}
@@ -46,6 +55,9 @@ class InstrumentOptionDialog(QDialog):
 			checked['API']=True
 
 		return checked
+
+	def GetCheckedItemData(self):
+		return self.apiTreeModel.GetCheckedItemData()
 
 class ConfigurationDialog(QDialog):
 	def __init__(self,parent=None,rabcdasm='',log_level=0):
@@ -86,8 +98,9 @@ class ConfigurationDialog(QDialog):
 			self.rabcdasm_line.setText(dir_name)
 
 class TreeItem(object):
-	def __init__(self,data,parent=None,assoc_data=None):
+	def __init__(self,data,parent=None,assoc_data=None,checked=Qt.Checked):
 		self.parentItem=parent
+		self.checked=checked
 		self.itemData=data
 		self.assocData=assoc_data
 		self.childItems=[]
@@ -101,11 +114,23 @@ class TreeItem(object):
 	def childCount(self):
 		return len(self.childItems)
 
+	def children(self):
+		return self.childItems
+
 	def columnCount(self):
 		return len(self.itemData)
 
+	def setAssocData(self,data):
+		self.assocData=data
+
 	def getAssocData(self):
 		return self.assocData
+
+	def setChecked(self,checked):
+		self.checked=checked
+
+	def getChecked(self):
+		return self.checked
 
 	def data(self,column):
 		try:
@@ -123,8 +148,9 @@ class TreeItem(object):
 		return 0
 
 class TreeModel(QAbstractItemModel):
-	def __init__(self,root_item,parent=None):
+	def __init__(self,root_item,parent=None,checkable=False):
 		super(TreeModel, self).__init__(parent)
+		self.Checkable=checkable
 		self.DirItems={}
 		self.rootItem=TreeItem(root_item)
 		self.setupModelData()
@@ -153,26 +179,61 @@ class TreeModel(QAbstractItemModel):
 					item=TreeItem((refid,),dir_item,(root_dir, class_name, refid))
 					dir_item.appendChild(item)
 
-	def showAPIs(self,api_names,multi_namels):
+	def showAPIs(self,api_names,multi_namels,show_call_op=False,single_column=False,show_caller=True):
 		api_names_list=api_names.keys()
 		api_names_list.sort()
 		for api_name in api_names_list:
-			dir_item=TreeItem((api_name,"API"))
-			self.rootItem.appendChild(dir_item)
+			first_entry=True
 			for [op,root_dir,class_name,refid,block_id,block_line_no] in api_names[api_name]:
-				item=TreeItem((refid,op,),dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
-				dir_item.appendChild(item)
+				if show_call_op and not op.startswith('call'):
+					continue
+
+				if first_entry:
+					item_data=[api_name,]
+					if not single_column:
+						item_data.append("API")
+					dir_item=TreeItem(item_data)
+
+					self.rootItem.appendChild(dir_item)
+					first_entry=False
+
+				if show_caller:
+					item_data=[refid,]
+					if not single_column:
+						item_data.append(op)				
+					item=TreeItem(item_data,dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
+					dir_item.appendChild(item)
 
 		for multi_namel in multi_namels.keys():
 			added_root=False
 			for [op,root_dir,class_name,refid,block_id,block_line_no] in multi_namels[multi_namel]:
 				if op.startswith('call'):
 					if not added_root:
-						dir_item=TreeItem((multi_namel,"Dynamic"))
+						item_data=[multi_namel,]
+						if not single_column:
+							item_data.append("Dynamic")
+
+						dir_item=TreeItem(item_data)
 						self.rootItem.appendChild(dir_item)
 						added_root=True
-					item=TreeItem((refid,op,),dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
-					dir_item.appendChild(item)
+
+					if show_caller:
+						item_data=[refid,]
+						if not single_column:
+							item_data.append(op)
+
+						item=TreeItem(item_data,dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
+						dir_item.appendChild(item)
+
+	def GetCheckedItemData(self):
+		data=[]
+		for l1_item in self.rootItem.children():
+			if l1_item.getChecked()==Qt.Checked:
+				for l2_item in l1_item.children():
+					if l2_item.getChecked()==Qt.Checked:
+						data.append(l2_item.getAssocData())
+
+		return data
 
 	DebugShowTrace=0
 	def showTrace(self,repeat_info_list):
@@ -244,6 +305,18 @@ class TreeModel(QAbstractItemModel):
 	def setupModelData(self):
 		pass
 
+	def setData(self,index,value,role):
+		if role==Qt.CheckStateRole and index.column()==0:
+			item=index.internalPointer()
+
+			if value==0:
+				item.setChecked(Qt.Unchecked)
+			else:
+				item.setChecked(Qt.Checked)
+			self.dataChanged.emit(index, index)
+
+		return True
+
 	def columnCount(self,parent):
 		if parent.isValid():
 			return parent.internalPointer().columnCount()
@@ -266,9 +339,20 @@ class TreeModel(QAbstractItemModel):
 			color=item.getAssocData()
 			return color
 
+		elif role==Qt.CheckStateRole and self.Checkable:
+			if index.column()==0:
+				item=index.internalPointer()
+				checked=item.getChecked()
+
+				if checked==Qt.Unchecked:
+					return Qt.Unchecked
+				elif checked==Qt.Checked:
+					return Qt.Checked
+
 		elif role==Qt.DisplayRole:
 			item=index.internalPointer()
 			return item.data(index.column())
+
 		return None
 
 	def headerData(self,section,orientation,role):
@@ -322,7 +406,11 @@ class TreeModel(QAbstractItemModel):
 		if not index.isValid():
 			return Qt.NoItemFlags
 
-		return Qt.ItemIsEnabled|Qt.ItemIsSelectable
+		ret=Qt.ItemIsEnabled|Qt.ItemIsSelectable
+		if index.column()==0:
+			ret|=Qt.ItemIsUserCheckable
+
+		return ret
 
 class MainWindow(QMainWindow):
 	UseDock=False
@@ -526,7 +614,7 @@ class MainWindow(QMainWindow):
 
 	def performInstrument(self):
 		#Show dialog
-		dialog=InstrumentOptionDialog()
+		dialog=InstrumentOptionDialog(asasm=self.asasm)
 		if dialog.exec_():
 			checked=dialog.GetCheckState()
 
@@ -534,7 +622,19 @@ class MainWindow(QMainWindow):
 				target_root_dir=os.path.dirname(self.SWFFilename)
 
 				if checked['API']:
-					self.asasm.Instrument(operations=[["AddAPITrace",''], ["Include",["../Util-0/Util.script.asasm"]]])
+					checked_items=dialog.GetCheckedItemData()
+					locator={}
+					for [op,root_dir,class_name,refid,block_id,block_line_no] in checked_items:
+						if not locator.has_key(refid):
+							locator[refid]={}
+
+						if not locator[refid].has_key(block_id):
+							locator[refid][block_id]={}
+
+						if not locator[refid][block_id].has_key(block_line_no):
+							locator[refid][block_id][block_line_no]=True
+
+					self.asasm.Instrument(operations=[["AddAPITrace",{'Locator':locator}], ["Include",["../Util-0/Util.script.asasm"]]])
 
 				if checked['BasicBlock']:
 					self.asasm.Instrument(operations=[["AddBasicBlockTrace",'']])
@@ -606,7 +706,7 @@ class MainWindow(QMainWindow):
 
 		[local_names,api_names,multi_names,multi_namels]=self.asasm.GetNames()
 		self.apiTreeModel=TreeModel(("Name",""))
-		self.apiTreeModel.showAPIs(api_names,multi_namels)
+		self.apiTreeModel.showAPIs(api_names,multi_namels,True)
 		self.apiTreeView.setModel(self.apiTreeModel)
 		self.apiTreeView.connect(self.apiTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.apiTreeSelected)
 		self.apiTreeView.expandAll()
