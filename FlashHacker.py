@@ -20,7 +20,7 @@ class CodeEdit(QTextEdit):
 				disasm_text+='%s:\n'% labels[block_id]
 
 			for [op,operand] in blocks[block_id]:
-				disasm_text+='\t%s\n' % (op)
+				disasm_text+='\t%s' % (op)
 				if operand:
 					disasm_text+='\t%s' % operand
 				disasm_text+='\n'
@@ -119,7 +119,7 @@ class ConfigurationDialog(QDialog):
 			self.rabcdasm_line.setText(dir_name)
 
 class TreeItem(object):
-	def __init__(self,data,parent=None,assoc_data=None,checked=Qt.Checked):
+	def __init__(self,data,parent=None,assoc_data=None,checked=Qt.Unchecked):
 		self.parentItem=parent
 		self.checked=checked
 		self.itemData=data
@@ -365,10 +365,10 @@ class TreeModel(QAbstractItemModel):
 				item=index.internalPointer()
 				checked=item.getChecked()
 
-				if checked==Qt.Unchecked:
-					return Qt.Unchecked
-				elif checked==Qt.Checked:
+				if checked==Qt.Checked:
 					return Qt.Checked
+				else:
+					return Qt.Unchecked
 
 		elif role==Qt.DisplayRole:
 			item=index.internalPointer()
@@ -756,7 +756,7 @@ class MainWindow(QMainWindow):
 			if tab_index==0:
 				self.codeEdit.showDisasms(blocks,labels)
 
-			if tab_index==1:
+			elif tab_index==1:
 				show_graph=True
 				if len(blocks)>200:
 					msgBox=QMessageBox()
@@ -780,18 +780,36 @@ class MainWindow(QMainWindow):
 			self.ShowCode(self.rightTabWidget.currentIndex())
 
 	def rightTabWidgetIndexChanged(self,index):
-		self.ShowCode(index)
+		left_tab_index=self.leftTabWidget.currentIndex()
+		if left_tab_index==0:
+			self.ShowCode(index)
+		elif left_tab_index==1:
+			self.showCodeForApiTree(index)
+
+	def showCodeForApiTree(self,tab_index):
+		if not self.treeModel:
+			return
+
+		item_data=self.treeModel.getAssocData(self.currentAPITreeIndex)
+		if item_data!=None:
+			(op,root_dir,class_name,refid,block_id,block_line_no)=item_data
+					
+			[parsed_lines,methods]=self.Assemblies[root_dir][class_name]
+			(blocks,maps,labels,parents,body_parameters)=methods[refid]
+
+			if tab_index==0:
+				self.codeEdit.showDisasms(blocks,labels)
+
+			elif tab_index==1:
+				[parsed_lines,methods]=self.Assemblies[root_dir][class_name]
+				[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
+				self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
+				self.graph.HilightAddress(block_id)
 
 	def apiTreeSelected(self, newSelection, oldSelection):
 		for index in newSelection.indexes():
-				item_data=self.treeModel.getAssocData(index)
-				if item_data!=None:
-					(op,root_dir,class_name,refid,block_id,block_line_no)=item_data
-					
-					[parsed_lines,methods]=self.Assemblies[root_dir][class_name]
-					[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
-					self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
-					self.graph.HilightAddress(block_id)
+			self.currentAPITreeIndex=index
+			self.showCodeForApiTree(self.rightTabWidget.currentIndex())
 
 	def showConfiguration(self):
 		dialog=ConfigurationDialog(rabcdasm=self.RABCDAsmPath)
