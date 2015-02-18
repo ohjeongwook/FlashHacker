@@ -222,7 +222,7 @@ class TreeModel(QAbstractItemModel):
 					item_data=[refid,]
 					if not single_column:
 						item_data.append(op)				
-					item=TreeItem(item_data,dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
+					item=TreeItem(item_data,dir_item,(op,root_dir,class_name,refid,block_id,block_line_no),checked=Qt.Checked)
 					dir_item.appendChild(item)
 
 		for multi_namel in multi_namels.keys():
@@ -243,7 +243,7 @@ class TreeModel(QAbstractItemModel):
 						if not single_column:
 							item_data.append(op)
 
-						item=TreeItem(item_data,dir_item,(op,root_dir,class_name,refid,block_id,block_line_no))
+						item=TreeItem(item_data,dir_item,(op,root_dir,class_name,refid,block_id,block_line_no),checked=Qt.Checked)
 						dir_item.appendChild(item)
 
 	def GetCheckedItemData(self):
