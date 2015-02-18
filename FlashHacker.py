@@ -653,6 +653,8 @@ class MainWindow(QMainWindow):
 			if checked['API'] or checked['BasicBlock'] or checked['Method']:
 				target_root_dir=os.path.dirname(self.SWFFilename)
 
+				instrumented=False
+
 				if checked['API']:
 					checked_items=dialog.GetCheckedItemData()
 					locator={}
@@ -666,17 +668,21 @@ class MainWindow(QMainWindow):
 						if not locator[refid][block_id].has_key(block_line_no):
 							locator[refid][block_id][block_line_no]=True
 
-					self.asasm.Instrument(operations=[["AddAPITrace",{'Locator':locator}], ["Include",["../Util-0/Util.script.asasm"]]])
+					self.asasm.Instrument(operations=[["AddAPITrace",{'Locator':locator}]])
+					instrumented=True
 
 				if checked['BasicBlock']:
 					self.asasm.Instrument(operations=[["AddBasicBlockTrace",'']])
+					instrumented=True
 
 				elif checked['Method']:
 					self.asasm.Instrument(operations=[["AddMethodTrace",'']])
-				
-				
-				self.asasm.Save(target_root_dir=target_root_dir)
-				self.saveAs()
+					instrumented=True
+
+				if instrumented:
+					self.asasm.Instrument(operations=[["Include",["../Util-0/Util.script.asasm"]]])
+					self.asasm.Save(target_root_dir=target_root_dir)
+					self.saveAs()
 
 	def loadLogTrace(self):
 		self.leftTabWidget.setCurrentIndex(2)

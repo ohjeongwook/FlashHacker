@@ -236,7 +236,7 @@ class ASASM:
 
 	def WriteToFiles(self,target_root_dir='',target_dir='',update_code=True):
 		for root_dir in self.Assemblies.keys():
-			if target_root_dir:
+			if not target_dir:
 				target_dir=os.path.join(target_root_dir,os.path.basename(root_dir))
 
 			if self.DebugWriteToFile>0:
@@ -942,13 +942,12 @@ class ASASM:
 							self.Assemblies[root_dir][file][0]=process_lines
 
 	def Save(self,target_root_dir='',target_dir=''):
-		if target_root_dir or target_dir:
-			if self.DebugInstrument>0:
-				if target_root_dir:
-					print 'Write to files:', target_root_dir
-				else:
-					print 'Write to files:', target_dir
-			self.WriteToFiles(target_root_dir=target_root_dir,target_dir=target_dir)
+		if self.DebugInstrument>0:
+			if target_root_dir:
+				print 'Write to files:', target_root_dir
+			else:
+				print 'Write to files:', target_dir
+		self.WriteToFiles(target_root_dir=target_root_dir,target_dir=target_dir)
 
 	DebugParse=0
 	def ParseTraitLine(self,line):
