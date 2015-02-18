@@ -7,6 +7,27 @@ import shutil
 
 from FlashManipulation import *
 
+class CodeEdit(QTextEdit):
+	def __init__(self,parent=None):
+		super(CodeEdit,self).__init__(parent)
+
+	def showDisasms(self,blocks,labels):
+		disasm_text=''
+		block_ids=blocks.keys()
+		block_ids.sort()
+		for block_id in block_ids:
+			if labels.has_key(block_id):
+				disasm_text+='%s:\n'% labels[block_id]
+
+			for [op,operand] in blocks[block_id]:
+				disasm_text+='\t%s\n' % (op)
+				if operand:
+					disasm_text+='\t%s' % operand
+				disasm_text+='\n'
+			disasm_text+='\n'
+				
+		self.setText(disasm_text)
+
 class InstrumentOptionDialog(QDialog):
 	def __init__(self,parent=None,asasm=None):
 		super(InstrumentOptionDialog,self).__init__(parent)
@@ -423,28 +444,39 @@ class MainWindow(QMainWindow):
 
 		self.asasm=ASASM()
 
+		self.treeModel=None
 		self.Directories=[]
 		self.SWFFilename=''
 		self.SWFOutFilename=''
 
+		# Left Tab
 		vertical_splitter=QSplitter()
 
-		self.tabWidget=QTabWidget()
+		self.leftTabWidget=QTabWidget()
 
 		self.classTreeView=QTreeView()
-		self.tabWidget.addTab(self.classTreeView,"Classes")
+		self.leftTabWidget.addTab(self.classTreeView,"Classes")
 
 		self.apiTreeView=QTreeView()
-		self.tabWidget.addTab(self.apiTreeView,"API")
+		self.leftTabWidget.addTab(self.apiTreeView,"API")
 
 		self.traceTreeView=QTreeView()
-		self.tabWidget.addTab(self.traceTreeView,"Trace")
+		self.leftTabWidget.addTab(self.traceTreeView,"Trace")
 
-		vertical_splitter.addWidget(self.tabWidget)
+		vertical_splitter.addWidget(self.leftTabWidget)
+
+		# Right Tab
+		self.rightTabWidget=QTabWidget()
+		self.rightTabWidget.connect(self.rightTabWidget,SIGNAL("currentChanged(int)"), self.rightTabWidgetIndexChanged)
 
 		self.graph=MyGraphicsView()
 		self.graph.setRenderHints(QPainter.Antialiasing)
-		vertical_splitter.addWidget(self.graph)
+
+		self.codeEdit=CodeEdit()
+		self.rightTabWidget.addTab(self.codeEdit,"Code")
+		self.rightTabWidget.addTab(self.graph,"Graph")
+
+		vertical_splitter.addWidget(self.rightTabWidget)
 		vertical_splitter.setStretchFactor(0,0)
 		vertical_splitter.setStretchFactor(1,1)
 
@@ -471,7 +503,7 @@ class MainWindow(QMainWindow):
 
 	def openSWF(self,filename,reload=True):
 		self.SWFFilename=filename
-		self.tabWidget.setCurrentIndex(0)
+		self.leftTabWidget.setCurrentIndex(0)
 		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
 		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
 
@@ -647,7 +679,7 @@ class MainWindow(QMainWindow):
 				self.saveAs()
 
 	def loadLogTrace(self):
-		self.tabWidget.setCurrentIndex(2)
+		self.leftTabWidget.setCurrentIndex(2)
 		filename = QFileDialog.getOpenFileName(self,"Open Log file","","Log Files (*.txt)|All Files (*.*)")[0]
 		if filename:
 			repeat_info_list=self.asasm.LoadLogFile(filename)
@@ -711,15 +743,44 @@ class MainWindow(QMainWindow):
 		self.apiTreeView.connect(self.apiTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.apiTreeSelected)
 		self.apiTreeView.expandAll()
 
-	def classTreeSelected(self, newSelection, oldSelection):
-		for index in newSelection.indexes():
-			item_data=self.treeModel.getAssocData(index)
-			if item_data!=None:
-				(root_dir,class_name,refid)=item_data
-				[parsed_lines,methods]=self.Assemblies[root_dir][class_name]
+	def ShowCode(self,tab_index):
+		if not self.treeModel:
+			return
 
-				[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])
-				self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
+		item_data=self.treeModel.getAssocData(self.currentClassTreeIndex)
+		if item_data!=None:
+			(root_dir,class_name,refid)=item_data
+			[parsed_lines,methods]=self.Assemblies[root_dir][class_name]
+			(blocks,maps,labels,parents,body_parameters)=methods[refid]
+
+			if tab_index==0:
+				self.codeEdit.showDisasms(blocks,labels)
+
+			if tab_index==1:
+				show_graph=True
+				if len(blocks)>200:
+					msgBox=QMessageBox()
+					msgBox.setText("Too many nodes")
+					msgBox.setInformativeText("The graph is too big, do you want to display?")
+					msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+					msgBox.setDefaultButton(QMessageBox.No)
+					ret = msgBox.exec_()
+
+					show_graph=False
+					if ret==QMessageBox.Yes:
+						show_graph=True
+
+				if show_graph:
+					[disasms,links,address2name]=self.asasm.ConvertMapsToPrintable(methods[refid])				
+					self.graph.DrawFunctionGraph("Target", disasms, links, address2name=address2name)
+
+	def classTreeSelected(self,newSelection,oldSelection):
+		for index in newSelection.indexes():
+			self.currentClassTreeIndex=index
+			self.ShowCode(self.rightTabWidget.currentIndex())
+
+	def rightTabWidgetIndexChanged(self,index):
+		self.ShowCode(index)
 
 	def apiTreeSelected(self, newSelection, oldSelection):
 		for index in newSelection.indexes():
