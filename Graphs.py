@@ -4,7 +4,6 @@ import pprint
 from PySide.QtGui import *
 from PySide.QtCore import *
 import FlowGrapher
-import DarunGrimDatabase
 
 TYPE_DI_RECTS=0
 TYPE_DI_DRAW=1
