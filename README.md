@@ -9,8 +9,8 @@ The whole concept was introduced in my previous presentation at ShmooCon 2012
 
 ## Prerequisite
 * PySide: https://pypi.python.org/pypi/PySide (pip install -U PySide on Windows)
-* Graphviz 2.x: included in the repo\
-* RABCDasm binaries: https://github.com/CyberShadow/RABCDAsm/releases
+* Graphviz 2.x: (included in the distribution)
+* RABCDasm binaries: https://github.com/CyberShadow/RABCDAsm/releases (included in the distribution)
 
 After installing prerequisites, run python FlashHacker.py and it will ask path for RABCDasm package. 
 
