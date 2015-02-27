@@ -203,6 +203,7 @@ class MyGraphicsView(QGraphicsView):
 	def __init__(self):
 		self.scene=GraphScene()
 		QGraphicsView.__init__(self,self.scene)
+		self.SelectBlockCallback=None
 		self.setStyleSheet("QGraphicsView { background-color: rgb(99.5%, 99.5%, 99.5%); }")
 		self.setRenderHints(QPainter.Antialiasing|QPainter.SmoothPixmapTransform)
 		self.setDragMode(self.ScrollHandDrag)
@@ -298,7 +299,7 @@ class MyGraphicsView(QGraphicsView):
 
 	def mousePressEvent(self,event):
 		QGraphicsView.mousePressEvent(self,event)
-		if self.scene.SelectedAddress!=None:
+		if self.scene.SelectedAddress is not None and self.SelectBlockCallback is not None:
 			self.HilightAddress(self.scene.SelectedAddress,False)
 			self.SelectBlockCallback(self,self.scene.SelectedAddress)
 
