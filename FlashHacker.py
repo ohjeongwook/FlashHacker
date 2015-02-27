@@ -459,8 +459,10 @@ class MainWindow(QMainWindow):
 		self.SWFFilename=''
 		self.SWFOutFilename=''
 
-		# Left Tab
 		vertical_splitter=QSplitter()
+		vertical_splitter.setOrientation(Qt.Vertical)
+		# Left Tab
+		horizontal_splitter=QSplitter()
 
 		self.leftTabWidget=QTabWidget()
 
@@ -473,7 +475,7 @@ class MainWindow(QMainWindow):
 		self.traceTreeView=QTreeView()
 		self.leftTabWidget.addTab(self.traceTreeView,"Trace")
 
-		vertical_splitter.addWidget(self.leftTabWidget)
+		horizontal_splitter.addWidget(self.leftTabWidget)
 
 		# Right Tab
 		self.rightTabWidget=QTabWidget()
@@ -486,10 +488,16 @@ class MainWindow(QMainWindow):
 		self.rightTabWidget.addTab(self.codeEdit,"Code")
 		self.rightTabWidget.addTab(self.graph,"Graph")
 
-		vertical_splitter.addWidget(self.rightTabWidget)
-		vertical_splitter.setStretchFactor(0,0)
-		vertical_splitter.setStretchFactor(1,1)
+		horizontal_splitter.addWidget(self.rightTabWidget)
+		horizontal_splitter.setStretchFactor(0,0)
+		horizontal_splitter.setStretchFactor(1,1)
 
+		vertical_splitter.addWidget(horizontal_splitter)
+		self.logWidget=QTextEdit()
+		vertical_splitter.addWidget(self.logWidget)
+		vertical_splitter.setStretchFactor(0,1)
+		vertical_splitter.setStretchFactor(1,0)
+		
 		main_widget=QWidget()
 		vlayout=QVBoxLayout()
 		vlayout.addWidget(vertical_splitter)
@@ -520,11 +528,11 @@ class MainWindow(QMainWindow):
 		cmdline="\"%s\" \"%s\"" % (abcexport,filename)
 
 		if self.DebugFileOperation>-1:
-			print '* Executing: %s' % cmdline
+			self.logWidget.append('* Executing: %s' % cmdline)
 
 		ouput=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
-		if self.DebugFileOperation>-1:
-			print ouput
+		if self.DebugFileOperation>-1 and ouput:
+			self.logWidget.append(ouput)
 
 		dir_name=os.path.dirname(filename)
 		base_filename='.'.join(os.path.basename(filename).split('.')[0:-1])
@@ -545,7 +553,7 @@ class MainWindow(QMainWindow):
 				if not os.path.isdir(abc_dirname):
 					cmdline="\"%s\" \"%s\"" % (rabcdasm,abc_filename)
 					if self.DebugFileOperation>-1:
-						print '* Executing: %s' % cmdline
+						self.logWidget.append('* Executing: %s' % cmdline)
 
 					output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
 
@@ -606,7 +614,7 @@ class MainWindow(QMainWindow):
 				self.SWFOutFilename=QFileDialog.getSaveFileName(self,'Save File',target_root_dir,'SWF (*.swf *.*)')[0]
 
 			if self.DebugFileOperation>-1:
-				print 'copy',self.SWFFilename,self.SWFOutFilename
+				self.logWidget.append('copy %s -> %s' % (self.SWFFilename,self.SWFOutFilename))
 
 			try:
 				shutil.copy(self.SWFFilename,self.SWFOutFilename)
@@ -629,20 +637,20 @@ class MainWindow(QMainWindow):
 				cmdline="\"%s\" \"%s\"" % (rabcasm,main_asasm_file)
 
 				if self.DebugFileOperation>-1:
-					print '* Executing: %s' % cmdline
+					self.logWidget.append('* Executing: %s' % cmdline)
 
 				output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
-				if self.DebugFileOperation>-1:
-					print output
+				if self.DebugFileOperation>-1 and output:
+					self.logWidget.append(output)
 
 				cmdline="\"%s\" \"%s\" %d \"%s\"" % (abcreplace,self.SWFOutFilename,i,abc_file)
 
 				if self.DebugFileOperation>-1:
-					print '* Executing: %s' % cmdline
+					self.logWidget.append('* Executing: %s' % cmdline)
 
 				output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
-				if self.DebugFileOperation>-1:
-					print output
+				if self.DebugFileOperation>-1 and output:
+					self.logWidget.append(output)
 
 				i+=1
 
