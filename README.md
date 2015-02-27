@@ -15,7 +15,7 @@ The whole concept was introduced in my previous presentation at ShmooCon 2012
 After installing prerequisites, run python FlashHacker.py and it will ask path for RABCDasm package. 
 
 ## LICENSE
-Copyright (c) 2010, Jeong Wook Oh
+Copyright (c) 2015, Jeong Wook Oh
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
