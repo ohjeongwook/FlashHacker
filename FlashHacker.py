@@ -1,3 +1,12 @@
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__),'FlowGrapher'))
+os.environ['PATH'] = os.path.join(os.path.dirname(__file__),r'Bin\GraphViz') + \
+					';' + \
+					os.path.join(os.path.dirname(__file__),'FlowGrapher') + \
+					';' + \
+					os.environ['PATH']
 from PySide.QtCore import *
 from PySide.QtGui import *
 from PySide.QtSql import *
