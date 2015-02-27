@@ -455,7 +455,6 @@ class MainWindow(QMainWindow):
 		self.asasm=ASASM()
 
 		self.treeModel=None
-		self.Directories=[]
 		self.SWFFilename=''
 		self.SWFOutFilename=''
 
@@ -519,140 +518,30 @@ class MainWindow(QMainWindow):
 	def reload(self):
 		self.openSWF(self.SWFFilename,reload=True)
 
+	def logCallback(self,message):
+		self.logWidget.append(message)
+		
 	def openSWF(self,filename,reload=True):
 		self.SWFFilename=filename
 		self.leftTabWidget.setCurrentIndex(0)
-		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
-		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
-
-		cmdline="\"%s\" \"%s\"" % (abcexport,filename)
-
-		if self.DebugFileOperation>-1:
-			self.logWidget.append('* Executing: %s' % cmdline)
-
-		ouput=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
-		if self.DebugFileOperation>-1 and ouput:
-			self.logWidget.append(ouput)
-
-		dir_name=os.path.dirname(filename)
-		base_filename='.'.join(os.path.basename(filename).split('.')[0:-1])
-
-		i=0
-		abc_dirnames=[]
-		while True:
-			abc_filename=os.path.join(dir_name,'%s-%d.abc' % (base_filename,i)).replace('/','\\')
-			abc_dirname=os.path.join(dir_name,'%s-%d' % (base_filename,i)).replace('/','\\')
-
-			if os.path.isfile(abc_filename):
-				if self.DebugFileOperation>0:
-					print 'abc_filename:', abc_filename
-
-				if reload and os.path.isdir(abc_dirname):
-					shutil.rmtree(abc_dirname)
-
-				if not os.path.isdir(abc_dirname):
-					cmdline="\"%s\" \"%s\"" % (rabcdasm,abc_filename)
-					if self.DebugFileOperation>-1:
-						self.logWidget.append('* Executing: %s' % cmdline)
-
-					output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
-
-					if self.DebugFileOperation>0:
-						print output
-
-					abc_dirname=os.path.join(dir_name,'%s-%d' % (base_filename,i))
-
-					if self.DebugFileOperation>0:
-						print 'abc_dirname:', abc_dirname
-
-				if os.path.isdir(abc_dirname):
-					if self.DebugFileOperation>0:
-						print 'Disasm succeeded', abc_dirname
-					abc_dirnames.append(abc_dirname)
-			else:
-				break
-			i+=1
-
-		self.showDir(abc_dirnames)
+		swf_file=SWFFile(self.RABCDAsmPath,self.logCallback)
+		self.showDir(swf_file.ExtractSWF(filename))
 
 	def saveAs(self):
 		self.SWFOutFilename=''
 		self.save()
 
 	def save(self):
-		rabcasm=os.path.join(self.RABCDAsmPath,"rabcasm.exe")
-		abcreplace=os.path.join(self.RABCDAsmPath,"abcreplace.exe")
-
 		if self.DebugFileOperation>0:	
 			print 'self.SWFFilename:',self.SWFFilename
 
 		if self.SWFFilename:
-			dir_name=os.path.dirname(self.SWFFilename)
-			base_name=os.path.basename(self.SWFFilename)
-			main_name='.'.join(base_name.split('.')[0:-1])
-			i=0
-			target_root_dir=dir_name 
-
-			#Copy from Scripts\Util-0 to target_root_dir + Util-0\
-			util0_dir=os.path.join(os.path.dirname(os.path.realpath(__file__)),r"Scripts\Util-0")
-			target_util0_dir=os.path.join(target_root_dir,"Util-0")
-
-			try:
-				if os.path.isdir(target_util0_dir):
-					shutil.rmtree(target_util0_dir)
-			except:
-				import traceback
-				traceback.print_exc()
-
-			try:
-				shutil.copytree(util0_dir,target_util0_dir)
-			except:
-				import traceback
-				traceback.print_exc()
-
 			if not self.SWFOutFilename:
+				target_root_dir=os.path.dirname(self.SWFFilename)
 				self.SWFOutFilename=QFileDialog.getSaveFileName(self,'Save File',target_root_dir,'SWF (*.swf *.*)')[0]
-
-			if self.DebugFileOperation>-1:
-				self.logWidget.append('copy %s -> %s' % (self.SWFFilename,self.SWFOutFilename))
-
-			try:
-				shutil.copy(self.SWFFilename,self.SWFOutFilename)
-			except:
-				import traceback
-				traceback.print_exc()
-
-			while True:
-				main_asasm_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.asasm' % (main_name,i,main_name,i)).replace('/','\\')
-				abc_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.abc' % (main_name,i,main_name,i)).replace('/','\\')
-
-				if self.DebugFileOperation>0:
-					print 'main_asasm_file:',main_asasm_file
-				if not os.path.isfile(main_asasm_file):
-					break
-
-				if self.DebugFileOperation>0:
-					print 'Assembling', main_asasm_file
-
-				cmdline="\"%s\" \"%s\"" % (rabcasm,main_asasm_file)
-
-				if self.DebugFileOperation>-1:
-					self.logWidget.append('* Executing: %s' % cmdline)
-
-				output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
-				if self.DebugFileOperation>-1 and output:
-					self.logWidget.append(output)
-
-				cmdline="\"%s\" \"%s\" %d \"%s\"" % (abcreplace,self.SWFOutFilename,i,abc_file)
-
-				if self.DebugFileOperation>-1:
-					self.logWidget.append('* Executing: %s' % cmdline)
-
-				output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
-				if self.DebugFileOperation>-1 and output:
-					self.logWidget.append(output)
-
-				i+=1
+		
+			swf_file=SWFFile(self.RABCDAsmPath,self.logCallback)
+			swf_file.PackSWF(self.SWFFilename,self.SWFOutFilename)
 
 	def openDirectory(self):
 		dialog=QFileDialog()
@@ -750,7 +639,6 @@ class MainWindow(QMainWindow):
 		self.traceMenu.addAction(self.addLoadLogAct)
 
 	def showDir(self,dirs):
-		self.Directories=dirs
 		self.Assemblies=self.asasm.RetrieveAssemblies(dirs)
 
 		self.treeModel=TreeModel(("Name",))
@@ -758,7 +646,6 @@ class MainWindow(QMainWindow):
 		self.classTreeView.setModel(self.treeModel)
 		self.classTreeView.connect(self.classTreeView.selectionModel(),SIGNAL("selectionChanged(QItemSelection, QItemSelection)"), self.classTreeSelected)
 		self.classTreeView.expandAll()
-		#self.classTreeView.setSelectionMode(QAbstractItemView.MultiSelection)
 
 		[local_names,api_names,multi_names,multi_namels]=self.asasm.GetNames()
 		self.apiTreeModel=TreeModel(("Name",""))

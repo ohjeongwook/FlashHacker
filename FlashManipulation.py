@@ -1,13 +1,20 @@
 import sys
-import dircache
 import os
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'FlowGrapher'))
+os.environ['PATH'] = os.path.join(os.path.dirname(os.path.realpath(__file__)),r'Bin\GraphViz') + \
+					';' + \
+					os.path.join(os.path.dirname(os.path.realpath(__file__)),'FlowGrapher') + \
+					';' + \
+					os.environ['PATH']
+import dircache
 import pprint
 from copy import *
+import subprocess
+import shutil
 
 class ASASM:
 	def __init__(self,dir=''):
 		self.Assemblies={}
-		self.RetrieveAssembly(dir)
 
 	def ParseLine(self,line):
 		prefix=''
@@ -231,11 +238,13 @@ class ASASM:
 
 		fd.close()
 
-	def WriteToFiles(self,target_root_dir='',target_dir='',update_code=True):
+	def Save(self,target_root_dir='',target_dir='',update_code=True):
 		for root_dir in self.Assemblies.keys():
-			if not target_dir:
+			if  os.path.isdir(root_dir):
+				target_dir=root_dir
+			elif target_root_dir and not target_dir:
 				target_dir=os.path.join(target_root_dir,os.path.basename(root_dir))
-
+				
 			if self.DebugWriteToFile>0:
 				print 'root_dir:',root_dir
 				print 'target_dir:',target_dir
@@ -249,7 +258,7 @@ class ASASM:
 
 			for (file,(parsed_lines,methods)) in self.Assemblies[root_dir].items():
 				if self.DebugWriteToFile>0:
-					print '* WriteToFiles:', file
+					print '* Save:', file
 
 				new_filename=os.path.join(target_dir,file)
 
@@ -900,6 +909,7 @@ class ASASM:
 						if options.has_key('Patterns'):
 							patterns=options['Patterns']
 
+						locator={}
 						if options.has_key('Locator'):
 							locator=options['Locator']
 
@@ -937,14 +947,6 @@ class ASASM:
 								pprint.pprint(process_lines)
 
 							self.Assemblies[root_dir][file][0]=process_lines
-
-	def Save(self,target_root_dir='',target_dir=''):
-		if self.DebugInstrument>0:
-			if target_root_dir:
-				print 'Write to files:', target_root_dir
-			else:
-				print 'Write to files:', target_dir
-		self.WriteToFiles(target_root_dir=target_root_dir,target_dir=target_dir)
 
 	DebugParse=0
 	def ParseTraitLine(self,line):
@@ -1441,6 +1443,141 @@ class ASASM:
 
 		return repeat_info_list
 
+class SWFFile:
+	def __init__(self,rabcdasm_path,log_callback=None):
+		self.RABCDAsmPath=rabcdasm_path
+		self.logCallback=log_callback
+		
+	DebugFileOperation=0
+	def ExtractSWF(self,filename):
+		abcexport=os.path.join(self.RABCDAsmPath,"abcexport.exe")
+		rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
+
+		cmdline="\"%s\" \"%s\"" % (abcexport,filename)
+
+		if self.DebugFileOperation>-1:
+			if self.logCallback is not None:
+				self.logCallback('* Executing: %s' % cmdline)
+
+		ouput=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
+		if self.DebugFileOperation>-1 and ouput:
+			if self.logCallback is not None:
+				self.logCallback(ouput)
+
+		dir_name=os.path.dirname(filename)
+		base_filename='.'.join(os.path.basename(filename).split('.')[0:-1])
+
+		i=0
+		abc_dirnames=[]
+		while True:
+			abc_filename=os.path.join(dir_name,'%s-%d.abc' % (base_filename,i)).replace('/','\\')
+			abc_dirname=os.path.join(dir_name,'%s-%d' % (base_filename,i)).replace('/','\\')
+
+			if os.path.isfile(abc_filename):
+				if self.DebugFileOperation>0:
+					print 'abc_filename:', abc_filename
+
+				if reload and os.path.isdir(abc_dirname):
+					shutil.rmtree(abc_dirname)
+
+				if not os.path.isdir(abc_dirname):
+					cmdline="\"%s\" \"%s\"" % (rabcdasm,abc_filename)
+					if self.DebugFileOperation>-1:
+						if self.logCallback is not None:
+							self.logCallback('* Executing: %s' % cmdline)
+
+					output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
+
+					if self.DebugFileOperation>0:
+						print output
+
+					abc_dirname=os.path.join(dir_name,'%s-%d' % (base_filename,i))
+
+					if self.DebugFileOperation>0:
+						print 'abc_dirname:', abc_dirname
+
+				if os.path.isdir(abc_dirname):
+					if self.DebugFileOperation>0:
+						print 'Disasm succeeded', abc_dirname
+					abc_dirnames.append(abc_dirname)
+			else:
+				break
+			i+=1
+		return abc_dirnames
+		
+	def PackSWF(self,filename,out_filename):
+		rabcasm=os.path.join(self.RABCDAsmPath,"rabcasm.exe")
+		abcreplace=os.path.join(self.RABCDAsmPath,"abcreplace.exe")
+	
+		dir_name=os.path.dirname(filename)
+		base_name=os.path.basename(filename)
+		main_name='.'.join(base_name.split('.')[0:-1])
+		i=0
+		target_root_dir=dir_name 
+
+		#Copy from Scripts\Util-0 to target_root_dir + Util-0\
+		util0_dir=os.path.join(os.path.dirname(os.path.realpath(__file__)),r"Scripts\Util-0")
+		target_util0_dir=os.path.join(target_root_dir,"Util-0")
+
+		try:
+			if os.path.isdir(target_util0_dir):
+				shutil.rmtree(target_util0_dir)
+		except:
+			import traceback
+			traceback.print_exc()
+
+		try:
+			shutil.copytree(util0_dir,target_util0_dir)
+		except:
+			import traceback
+			traceback.print_exc()
+
+		if self.DebugFileOperation>-1:
+			if self.logCallback is not None:
+				self.logCallback('copy %s -> %s' % (filename,out_filename))
+
+		try:
+			shutil.copy(filename,out_filename)
+		except:
+			import traceback
+			traceback.print_exc()
+
+		while True:
+			main_asasm_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.asasm' % (main_name,i,main_name,i)).replace('/','\\')
+			abc_file=os.path.join(target_root_dir,'%s-%d\%s-%d.main.abc' % (main_name,i,main_name,i)).replace('/','\\')
+
+			if self.DebugFileOperation>0:
+				print 'main_asasm_file:',main_asasm_file
+			if not os.path.isfile(main_asasm_file):
+				break
+
+			if self.DebugFileOperation>0:
+				print 'Assembling', main_asasm_file
+
+			cmdline="\"%s\" \"%s\"" % (rabcasm,main_asasm_file)
+
+			if self.DebugFileOperation>-1:
+				if self.logCallback is not None:			
+					self.logCallback('* Executing: %s' % cmdline)
+
+			output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
+			if self.DebugFileOperation>-1 and output:
+				if self.logCallback is not None:			
+					self.logCallback(output)
+
+			cmdline="\"%s\" \"%s\" %d \"%s\"" % (abcreplace,out_filename,i,abc_file)
+
+			if self.DebugFileOperation>-1:
+				if self.logCallback is not None:			
+					self.logCallback('* Executing: %s' % cmdline)
+
+			output=subprocess.Popen(cmdline, shell=True, stdout=subprocess.PIPE).stdout.read()
+			if self.DebugFileOperation>-1 and output:
+				if self.logCallback is not None:			
+					self.logCallback(output)
+
+			i+=1
+
 if __name__=='__main__':
 	from optparse import OptionParser
 	import sys
@@ -1476,10 +1613,13 @@ if __name__=='__main__':
 	parser=OptionParser()
 	parser.add_option("-g","--graph",dest="graph",action="store_true",default=False)
 	parser.add_option("-r","--replace",dest="replace",action="store_true",default=False)
+	
 	parser.add_option("-D","--dump",dest="dump",action="store_true",default=False)
 	parser.add_option("-m","--method",dest="method",action="store_true",default=False)
 	parser.add_option("-b","--basic_blocks",dest="basic_blocks",action="store_true",default=False)
 	parser.add_option("-a","--api",dest="api",action="store_true",default=False)
+	parser.add_option("-R","--rabcdasm_path",dest="rabcdasm_path",help="",default=os.path.join(os.path.dirname(os.path.realpath(__file__)),r'Bin\RABCDasm'),metavar="RABCDASM_PATH")
+	
 	parser.add_option("-T","--test",dest="test",help="Perform basic tests",default='',metavar="TEST")
 	parser.add_option("-d","--asasm_dir",dest="asasm_dir",help="",default='',metavar="ASASM_DIR")
 	parser.add_option("-t","--target_dir",dest="target_dir",help="",default='',metavar="ASASM_SAVE_DIR")
@@ -1506,7 +1646,7 @@ if __name__=='__main__':
 
 		elif options.test.lower()=='reconstruct':
 			asasm.DebugMethods=0
-			asasm.WriteToFiles()
+			asasm.Save()
 
 		elif options.test.lower()=='name':
 			asasm=ASASM()
@@ -1552,9 +1692,24 @@ if __name__=='__main__':
 			asasm=ASASM()
 			asasm.LoadLogFile(args[0])
 
-	else:
-		asasm=ASASM(options.asasm_dir)
+	else:			
+		asasm=ASASM()
+		
+		target_root_dir=''
+		filename=''
+		out_filename=''
+		if len(args)>1:
+			filename=args[0]
+			out_filename=args[1]
+			target_root_dir=os.path.dirname(filename)
 
+			swf_file=SWFFile(options.rabcdasm_path)
+			abc_dirnames=swf_file.ExtractSWF(filename)
+			asasm.RetrieveAssemblies(abc_dirnames)
+
+		if not options.asasm_dir:
+			asasm.RetrieveAssembly(options.asasm_dir)
+			
 		if options.dump:
 			pprint.pprint(asasm.Assemblies)
 
@@ -1578,7 +1733,8 @@ if __name__=='__main__':
 			asasm.Instrument()
 
 		if options.api:
-			asasm.Instrument(operations=[["AddAPITrace",{'Patterns':['MultinameL']}], ["Include",["../Util-0/Util.script.asasm"]]], target_refids=args)
+			#asasm.Instrument(operations=[["AddAPITrace",{'Patterns':['MultinameL']}], ["Include",["../Util-0/Util.script.asasm"]]])
+			asasm.Instrument(operations=[["AddAPITrace",{}], ["Include",["../Util-0/Util.script.asasm"]]])
 
 		if options.method:
 			asasm.Instrument(operations=[["AddMethodTrace",'']])
@@ -1588,3 +1744,8 @@ if __name__=='__main__':
 
 		if options.target_dir:
 			asasm.Save(target_dir=options.target_dir)
+			
+		if target_root_dir and filename and out_filename:
+			asasm.Save(target_root_dir=target_root_dir)
+			swf_file=SWFFile(options.rabcdasm_path)
+			swf_file.PackSWF(filename,out_filename)
