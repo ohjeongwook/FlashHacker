@@ -1,6 +1,6 @@
 # FlashHacker
 
-FlashHacker is an ActionScript Bytecode instrumentation framework. The RABCDasm tool is used for disassembling and assembling of ActionScript ByteCode. And the tool uses Bytecode disassembly to inject various instrumentation instructions.
+FlashHacker is an ActionScript Bytecode instrumentation framework. The RABCDasm tool is used for disassembling and assembling of ActionScript Bytecode. And the tool uses Bytecode disassembly to inject various instrumentation instructions.
 
 This tool is very useful when you work with malicious Flash files.
 
