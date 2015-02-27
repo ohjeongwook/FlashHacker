@@ -1,10 +1,10 @@
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__),'FlowGrapher'))
-os.environ['PATH'] = os.path.join(os.path.dirname(__file__),r'Bin\GraphViz') + \
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'FlowGrapher'))
+os.environ['PATH'] = os.path.join(os.path.dirname(os.path.realpath(__file__)),r'Bin\GraphViz') + \
 					';' + \
-					os.path.join(os.path.dirname(__file__),'FlowGrapher') + \
+					os.path.join(os.path.dirname(os.path.realpath(__file__)),'FlowGrapher') + \
 					';' + \
 					os.environ['PATH']
 from PySide.QtCore import *
@@ -830,28 +830,38 @@ class MainWindow(QMainWindow):
 		dialog=ConfigurationDialog(rabcdasm=self.RABCDAsmPath)
 		if dialog.exec_():
 			self.RABCDAsmPath=dialog.rabcdasm_line.text()
+			return True
+		return False
 
 	def readSettings(self):
 		settings=QSettings("DarunGrim LLC", "FlashHacker")
 
+		default_rabcdasm_path=os.path.join(os.path.dirname(os.path.realpath(__file__)),r'Bin\RABCDasm')
+		self.RABCDAsmPath=default_rabcdasm_path
+		if settings.contains("General/RABCDAsmPath") and settings.value("General/RABCDAsmPath"):
+			self.RABCDAsmPath=settings.value("General/RABCDAsmPath")
+			rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
+			if not os.path.isfile(rabcdasm):
+				self.RABCDAsmPath=default_rabcdasm_path
+			
+				rabcdasm=os.path.join(self.RABCDAsmPath,"rabcdasm.exe")
+				if not os.path.isfile(rabcdasm):
+					self.showConfiguration()
+		
+		self.FirstConfigured=False
+		if not settings.contains("General/FirstConfigured"):
+			if self.showConfiguration():
+				self.FirstConfigured=True
+		else:
+			self.FirstConfigured=True
+		
 		self.ShowGraphs=True
 		if settings.contains("General/ShowGraphs"):
 			if settings.value("General/ShowGraphs")=='true':
 				self.ShowGraphs=True
 			else:
 				self.ShowGraphs=False
-
-		self.RABCDAsmPath=''
-		if settings.contains("General/RABCDAsmPath"):
-			self.RABCDAsmPath=settings.value("General/RABCDAsmPath")
-
-		self.FirstConfigured=False
-		if not settings.contains("General/FirstConfigured"):
-			self.showConfiguration()
-			self.FirstConfigured=True
-		else:
-			self.FirstConfigured=True
-
+							
 	def saveSettings(self):
 		settings = QSettings("DarunGrim LLC", "FlashHacker")
 		settings.setValue("General/ShowGraphs", self.ShowGraphs)
