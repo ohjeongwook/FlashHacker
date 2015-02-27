@@ -15,6 +15,7 @@ import subprocess
 import shutil
 
 from FlashManipulation import *
+from Graphs import *
 
 class CodeEdit(QTextEdit):
 	def __init__(self,parent=None):

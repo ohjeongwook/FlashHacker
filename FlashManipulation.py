@@ -4,9 +4,6 @@ import os
 import pprint
 from copy import *
 
-from Graphs import *
-import FlowGrapher
-
 class ASASM:
 	def __init__(self,dir=''):
 		self.Assemblies={}
@@ -1447,6 +1444,8 @@ class ASASM:
 if __name__=='__main__':
 	from optparse import OptionParser
 	import sys
+	from Graphs import *
+
 	class MainWindow(QMainWindow):
 		def __init__(self):
 			QMainWindow.__init__(self)
