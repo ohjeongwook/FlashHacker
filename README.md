@@ -9,7 +9,7 @@ The whole concept was introduced in my previous presentation at ShmooCon 2012
 
 ## Prerequisites
 * PySide: https://pypi.python.org/pypi/PySide (pip install -U PySide on Windows)
-* Graphviz 2.x: (included in the distribution)
+* Graphviz 2.x: http://graphviz.org/ (included in the distribution)
 * RABCDasm binaries: https://github.com/CyberShadow/RABCDAsm/releases (included in the distribution)
 
 ## LICENSE
