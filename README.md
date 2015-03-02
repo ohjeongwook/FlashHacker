@@ -11,7 +11,7 @@ The whole concept was introduced in my previous presentation at ShmooCon 2012
 * RABCDasm binaries: https://github.com/CyberShadow/RABCDAsm/releases (included in the distribution)
 
 ## How to use
-Download whole source tree and run python FlashHacker.py and it will pop up GUI. You can load a swf file and add instrumentation you want and save it as a new file. You can run the instrumented SWF file with debug version of Adobe Flash Player with provided mm.cfg under Environment folder and you will get useful debug log. Please be aware that the limitation of maximum Flash execution of 30 seconds exists. For more details on how the debug version of Adobe Flash works, please read https://helpx.adobe.com/flash-player/kb/configure-debugger-version-flash-player.html.
+Download whole source tree and run "python FlashHacker.py" and it will pop up GUI. You can load a swf file and add instrumentation you want and save it as a new file. You can also use FlashManipulation.py to use script based approach, but it is still under testing. You can run the instrumented SWF file with debug version of Adobe Flash Player with provided mm.cfg under Environment folder and you will get useful debug log. Please be aware that the limitation of maximum Flash execution of 30 seconds exists. For more details on how the debug version of Adobe Flash works, please read https://helpx.adobe.com/flash-player/kb/configure-debugger-version-flash-player.html.
 
 ## LICENSE
 Copyright (c) 2015, Jeong Wook Oh
