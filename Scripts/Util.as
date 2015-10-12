@@ -1,5 +1,6 @@
 package 
 {
+	import flash.display.*;
 	import flash.text.*;
 	import flash.utils.*;
 	import flash.net.*;
@@ -7,6 +8,10 @@ package
 	public class Util
 	{
 		private static var messageBuffer:String="";
+		private static var myTextBox:TextField = new TextField(); 
+		private static var init:Boolean = false;
+		private static var cnt:int = 0;
+		
 		public function Util() {
 		}
 
@@ -16,17 +21,60 @@ package
 			test.push(car);
 		}
 
+		//ex. class Main extends Sprite -> Util.doInit(this);
+		//if doInit not called, then DumpMessage defaults to using trace messages as before
+		public static function doInit(s:Sprite):void {
+			init = true;
+			myTextBox.width = 600; 
+			myTextBox.height = 600; 
+			myTextBox.multiline = true; 
+			myTextBox.wordWrap = true; 
+			myTextBox.border = true; 
+			
+			var f:TextFormat = new TextFormat(); 
+			f.font = "Courier"; 
+			f.size = 48; 
+			myTextBox.defaultTextFormat = f; 
+			
+			s.addChild(myTextBox); 
+		}
+		
 		public static function DumpMessage(message:String):void
 		{
 			messageBuffer+=message+"\n";
 
 			if(message.indexOf("Return:")==0)
 			{
-				trace(messageBuffer);
+				if (!init)
+				{
+					trace(messageBuffer);					
+				} 
+				else{
+					cnt++;
+					myTextBox.text += cnt.toString() + ":\n-------------------------------------\n" + messageBuffer + "\n\n"; 
+				}
 				messageBuffer="";
 			}
 		}
 
+		//this one is handy too because its easier to convert back to binary...
+		public static function ByteArrayToHex(buffer:ByteArray):String
+		{
+			var lines:String = "";
+			var l:int = buffer.length;
+			var origPosition:uint = buffer.position;
+			buffer.position = 0;
+			
+			for (var j:int = 0; j < buffer.length; j++)
+			{
+				var value:int = buffer.readUnsignedByte();
+				lines += fillUp(value.toString(16).toUpperCase(), 2, "0");
+			}
+			
+			buffer.position = origPosition;
+			return lines;
+		}
+		
 		public static function DumpAPI(filename:String, refid:String, instruction:String, array:Array):void
 		{
 			messageBuffer+="        API:" + instruction +"\n";
